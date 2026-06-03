@@ -1,0 +1,10 @@
+2026/06/02-22:02:20.706 22cc Reusing MANIFEST C:\Datos\Proyectos\bot-saas-futbol\whatsapp_bridge\.wwebjs_auth\session\Default\IndexedDB\https_web.whatsapp.com_0.indexeddb.leveldb/MANIFEST-000001
+2026/06/02-22:02:20.706 22cc Recovering log #4
+2026/06/02-22:02:20.795 22cc Reusing old log C:\Datos\Proyectos\bot-saas-futbol\whatsapp_bridge\.wwebjs_auth\session\Default\IndexedDB\https_web.whatsapp.com_0.indexeddb.leveldb/000004.log 
+2026/06/02-22:13:49.050 1688 Level-0 table #8: started
+2026/06/02-22:13:49.102 1688 Level-0 table #8: 1223891 bytes OK
+2026/06/02-22:13:49.104 1688 Delete type=0 #4
+2026/06/02-22:22:25.783 22cc Compacting 1@1 + 1@2 files
+2026/06/02-22:22:25.939 22cc Generated table #9@1: 21699 keys, 850483 bytes
+2026/06/02-22:22:25.939 22cc Compacted 1@1 + 1@2 files => 850483 bytes
+2026/06/02-22:22:25.942 22cc compacted to: files[ 0 0 1 0 0 0 0 ]
