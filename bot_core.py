@@ -27,8 +27,23 @@ def generar_prompt_maestro(config: dict, texto_turnos: str) -> str:
     cbu = settings.get("payment_cbu", "CBU.NO.CONFIGURADO")
     titular = settings.get("payment_holder", "TITULAR")
     
+    # --- INICIO DEL ANCLA TEMPORAL ---
+    # Calculamos la fecha y hora actual de Argentina para dársela a la IA
+    zona_argentina = timezone(timedelta(hours=-3))
+    ahora = datetime.now(zona_argentina)
+    dias = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"]
+    
+    fecha_hoy = ahora.strftime("%d/%m/%Y")
+    hora_hoy = ahora.strftime("%H:%M hs")
+    dia_semana = dias[ahora.weekday()]
+    # --- FIN DEL ANCLA TEMPORAL ---
+    
     prompt = f"""
 Eres el recepcionista virtual del complejo deportivo "{nombre_complejo}".
+
+[CONTEXTO TEMPORAL - RELOJ DEL SISTEMA]
+Hoy es {dia_semana}, {fecha_hoy} y la hora actual es {hora_hoy}. 
+USA ESTA FECHA para calcular matemáticamente a qué día se refiere el cliente cuando dice "hoy", "mañana", "pasado mañana" o cuando menciona un día de la semana.
 
 [PERSONALIDAD Y TONO]
 Rápido, profesional y cordial. Usá trato informal argentino ("vos"), pero TIENES ESTRICTAMENTE PROHIBIDO usar jergas como "che", "capo", "picadito" o "juntada".
@@ -42,7 +57,7 @@ A continuación, se listan los ÚNICOS turnos disponibles en la base de datos. N
 {texto_turnos}
 
 [FLUJO DE VENTA DIRECTO]
-Guía la conversación STRICTAMENTE en este orden:
+Guía la conversación ESTRICTAMENTE en este orden:
 1. Ofrece los horarios que encajen con lo que el cliente pide leyendo tu INVENTARIO. NUNCA le muestres la palabra "ID" ni el número de ID al cliente en tu mensaje de texto, usalo solo de manera interna.
 2. Cuando el cliente elija un horario, agradécele, pídele su Nombre Completo y DNI, y AÑADE ESTRICTAMENTE al final de tu respuesta esta etiqueta oculta: [RESERVAR_ID: X] (reemplazando la X por el ID exacto del turno que el cliente eligió).
 3. NO hables de pagos, transferencias ni reservas confirmadas. Tu único trabajo termina al pedir el nombre y escupir la etiqueta.

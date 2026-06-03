@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mi Complejo - SaaS Fútbol</title>
+    <style>
+        :root {
+            --bg-dark: #0f172a;
+            --panel-bg: #1e293b;
+            --accent: #10b981; /* Verde césped para los clientes */
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+        }
+        body { margin: 0; font-family: system-ui, sans-serif; background: var(--bg-dark); color: var(--text-main); display: flex; height: 100vh; }
+        
+        /* Sidebar lateral */
+        aside { width: 260px; background: var(--panel-bg); padding: 20px; border-right: 1px solid #334155; display: flex; flex-direction: column; }
+        .brand { font-size: 20px; font-weight: bold; margin-bottom: 40px; color: white; word-wrap: break-word; line-height: 1.2; }
+        
+        nav ul { list-style: none; padding: 0; margin: 0; flex: 1; }
+        nav li { padding: 12px 15px; margin-bottom: 8px; border-radius: 8px; cursor: pointer; color: var(--text-muted); transition: 0.2s; display: flex; align-items: center; gap: 10px; }
+        nav li:hover, nav li.active { background: #334155; color: white; border-left: 4px solid var(--accent); }
+        
+        /* Contenido principal */
+        main { flex: 1; padding: 40px; overflow-y: auto; }
+        .vista { display: none; }
+        .vista.activa { display: block; }
+        
+        /* Cajas de configuración */
+        .config-box { background: var(--panel-bg); border: 1px solid #334155; border-radius: 8px; padding: 25px; margin-bottom: 25px; max-width: 800px; }
+        .config-box h3 { margin-top: 0; color: white; border-bottom: 1px solid #334155; padding-bottom: 10px; margin-bottom: 20px; }
+        
+        .btn-primary { background: var(--accent); color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-weight: bold; }
+        .btn-primary:hover { background: #059669; }
+        .btn-danger { background: transparent; color: #ef4444; border: none; cursor: pointer; font-weight: bold; padding: 10px 0; text-align: left; }
+    </style>
+</head>
+<body>
+
+    <aside>
+        <div class="brand" id="ui-nombre-complejo">Cargando...</div>
+        <nav>
+            <ul>
+                <li class="active" onclick="cambiarVista('dashboard', this)">🏠 Inicio</li>
+                <li onclick="cambiarVista('canchas', this)">🏟️ Mis Canchas</li>
+                <li onclick="cambiarVista('reglas', this)">⏱️ Horarios y Reglas</li>
+                <li onclick="cambiarVista('pagos', this)">💰 Datos de Pago</li>
+                <li onclick="cambiarVista('whatsapp', this)">📱 Conexión Bot</li>
+            </ul>
+        </nav>
+        <button class="btn-danger" onclick="cerrarSesion()">🚪 Cerrar Sesión</button>
+    </aside>
+
+    <main>
+        <div id="vista-dashboard" class="vista activa">
+            <h1>Bienvenido a tu Panel</h1>
+            <p style="color: var(--text-muted);">Desde aquí podrás gestionar todas las configuraciones de tu complejo deportivo para que el bot atienda por vos.</p>
+        </div>
+
+        <div id="vista-canchas" class="vista">
+            <div class="config-box" style="max-width: 900px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #334155; padding-bottom: 10px; margin-bottom: 20px;">
+                    <h3 style="margin: 0; border: none; padding: 0;">Inventario de Canchas</h3>
+                    <button class="btn-primary" onclick="abrirModalCancha()">+ Añadir Cancha</button>
+                </div>
+                <p style="color: var(--text-muted); font-size: 14px; margin-bottom: 20px;">Agregá las canchas que el bot ofrecerá a los jugadores.</p>
+                
+                <table style="width: 100%; border-collapse: collapse; text-align: left;">
+                    <thead>
+                        <tr style="border-bottom: 1px solid #334155; color: var(--text-muted); font-size: 13px; text-transform: uppercase;">
+                            <th style="padding: 15px 10px;">Nombre / Ref</th>
+                            <th style="padding: 15px 10px;">Tipo</th>
+                            <th style="padding: 15px 10px;">Precio/Hora</th>
+                            <th style="padding: 15px 10px;">Estado</th>
+                            <th style="padding: 15px 10px;">Acciones</th> </tr>
+                        </tr>
+                    </thead>
+                    <tbody id="tabla-canchas">
+                        </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div id="modal-cancha" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); justify-content: center; align-items: center; z-index: 1000;">
+            <div style="background: var(--panel-bg); padding: 30px; border-radius: 8px; width: 400px; border: 1px solid #334155;">
+                <h2 id="modal-cancha-titulo" style="margin-top: 0; color: white;">Registrar Cancha</h2>
+                <form id="form-cancha" onsubmit="guardarCancha(event)">
+                    <input type="hidden" id="reg-cancha-id" value="">
+                    <div style="margin-bottom: 15px;">
+                        <label style="display: block; margin-bottom: 5px; color: var(--text-muted); font-size: 14px;">Nombre o Número</label>
+                        <input type="text" id="reg-cancha-nombre" required placeholder="Ej: Cancha 1 (Sintético)" style="width: 100%; padding: 10px; background: var(--bg-dark); border: 1px solid #334155; color: white; border-radius: 5px; box-sizing: border-box;">
+                    </div>
+                    <div style="margin-bottom: 15px;">
+                        <label style="display: block; margin-bottom: 5px; color: var(--text-muted); font-size: 14px;">Tipo de Cancha</label>
+                        <select id="reg-cancha-tipo" required style="width: 100%; padding: 10px; background: var(--bg-dark); border: 1px solid #334155; color: white; border-radius: 5px; box-sizing: border-box;">
+                            <option value="Fútbol 5">Fútbol 5</option>
+                            <option value="Fútbol 7">Fútbol 7</option>
+                            <option value="Fútbol 11">Fútbol 11</option>
+                        </select>
+                    </div>
+                    <div style="margin-bottom: 25px;">
+                        <label style="display: block; margin-bottom: 5px; color: var(--text-muted); font-size: 14px;">Precio por Hora ($)</label>
+                        <input type="number" id="reg-cancha-precio" required placeholder="Ej: 25000" style="width: 100%; padding: 10px; background: var(--bg-dark); border: 1px solid #334155; color: white; border-radius: 5px; box-sizing: border-box;">
+                    </div>
+                    <div style="display: flex; justify-content: flex-end; gap: 10px;">
+                        <button type="button" style="background: transparent; color: var(--text-muted); border: 1px solid #334155; padding: 10px 20px; border-radius: 6px; cursor: pointer;" onclick="cerrarModalCancha()">Cancelar</button>
+                        <button type="submit" class="btn-primary">Guardar</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <div id="vista-reglas" class="vista">
+            <div class="config-box">
+                <h3>Configuración Operativa</h3>
+                <p style="color: var(--text-muted); font-size: 14px; margin-bottom: 20px;">Definí cómo trabaja tu complejo.</p>
+                <form onsubmit="guardarSettings(event, 'reglas')">
+                    <div style="display: flex; gap: 15px; margin-bottom: 15px;">
+                        <div style="flex: 1;">
+                            <label style="display: block; margin-bottom: 5px; font-size: 14px; color: var(--text-muted);">Apertura</label>
+                            <input type="time" id="conf-apertura" required style="width: 100%; padding: 10px; background: var(--bg-dark); border: 1px solid #334155; color: white; border-radius: 5px; box-sizing: border-box;">
+                        </div>
+                        <div style="flex: 1;">
+                            <label style="display: block; margin-bottom: 5px; font-size: 14px; color: var(--text-muted);">Cierre</label>
+                            <input type="time" id="conf-cierre" required style="width: 100%; padding: 10px; background: var(--bg-dark); border: 1px solid #334155; color: white; border-radius: 5px; box-sizing: border-box;">
+                        </div>
+                    </div>
+                    
+                    <div style="margin-bottom: 15px;">
+                        <label style="display: block; margin-bottom: 5px; font-size: 14px; color: var(--text-muted);">Duración del turno (minutos)</label>
+                        <input type="number" id="conf-duracion" value="60" required style="width: 100%; padding: 10px; background: var(--bg-dark); border: 1px solid #334155; color: white; border-radius: 5px; box-sizing: border-box;">
+                    </div>
+
+                    <div style="margin-bottom: 15px;">
+                        <label style="display: block; margin-bottom: 5px; font-size: 14px; color: var(--text-muted);">Tolerancia para recibir el pago (minutos)</label>
+                        <input type="number" id="conf-tolerancia" value="15" required style="width: 100%; padding: 10px; background: var(--bg-dark); border: 1px solid #334155; color: white; border-radius: 5px; box-sizing: border-box;">
+                    </div>
+
+                    <div style="margin-bottom: 25px;">
+                        <label style="display: block; margin-bottom: 5px; font-size: 14px; color: var(--text-muted);">Política de Cobro</label>
+                        <select id="conf-tipo-cobro" style="width: 100%; padding: 12px; background: var(--bg-dark); border: 1px solid #334155; color: white; border-radius: 5px;">
+                            <option value="TOTAL">Cobrar el 100% de la cancha</option>
+                            <option value="SENA">Cobrar solo una seña fija</option>
+                        </select>
+                    </div>
+
+                    <button type="submit" class="btn-primary">Guardar Reglas</button>
+                </form>
+            </div>
+        </div>
+
+        <div id="vista-pagos" class="vista">
+            <div class="config-box">
+                <h3>Datos Bancarios</h3>
+                <p style="color: var(--text-muted); font-size: 14px; margin-bottom: 20px;">El bot enviará estos datos al jugador al momento de pedir el pago.</p>
+                <form onsubmit="guardarSettings(event, 'pagos')">
+                    <div style="margin-bottom: 15px;">
+                        <label style="display: block; margin-bottom: 5px; font-size: 14px; color: var(--text-muted);">Titular de la cuenta</label>
+                        <input type="text" id="conf-titular" placeholder="Ej: Juan Pérez" required style="width: 100%; padding: 10px; background: var(--bg-dark); border: 1px solid #334155; color: white; border-radius: 5px; box-sizing: border-box;">
+                    </div>
+                    <div style="margin-bottom: 15px;">
+                        <label style="display: block; margin-bottom: 5px; font-size: 14px; color: var(--text-muted);">CBU / CVU</label>
+                        <input type="text" id="conf-cbu" placeholder="000000000000000000" required style="width: 100%; padding: 10px; background: var(--bg-dark); border: 1px solid #334155; color: white; border-radius: 5px; box-sizing: border-box;">
+                    </div>
+                    <div style="margin-bottom: 25px;">
+                        <label style="display: block; margin-bottom: 5px; font-size: 14px; color: var(--text-muted);">Alias</label>
+                        <input type="text" id="conf-alias" placeholder="CANCHA.FUTBOL" required style="width: 100%; padding: 10px; background: var(--bg-dark); border: 1px solid #334155; color: white; border-radius: 5px; box-sizing: border-box;">
+                    </div>
+                    <button type="submit" class="btn-primary">Guardar Datos Bancarios</button>
+                </form>
+            </div>
+        </div>
+
+        <div id="vista-whatsapp" class="vista">
+            <div class="config-box" style="text-align: center;">
+                <h3>Vincular WhatsApp</h3>
+                <p style="color: var(--text-muted); font-size: 14px; margin-bottom: 20px;">Escaneá el código QR con el celular del complejo para encender el bot.</p>
+                
+                <div id="qr-container" style="background: white; width: 250px; height: 250px; margin: 0 auto; display: flex; justify-content: center; align-items: center; border-radius: 8px;">
+                    <span style="color: #333;">Generando QR...</span>
+                </div>
+                
+                <div style="margin-top: 30px; text-align: left; border-top: 1px solid #334155; padding-top: 20px;">
+                    <h4>Números Autorizados (Dueños)</h4>
+                    <p style="color: var(--text-muted); font-size: 13px;">Los números que agregues aquí recibirán las fotos de los comprobantes para aprobarlos.</p>
+                    <button class="btn-primary" style="font-size: 12px;">+ Añadir Número</button>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        // 1. GESTIÓN DE SESIÓN (El Patovica del Frontend)
+        document.addEventListener("DOMContentLoaded", () => {
+            const complejoId = localStorage.getItem('complejo_id');
+            const complejoNombre = localStorage.getItem('complejo_nombre');
+            
+            // Si no hay ID en la memoria, lo pateamos al login
+            if (!complejoId) {
+                window.location.href = 'login.html';
+                return;
+            }
+            
+            // Si está logueado, le damos la bienvenida con su nombre real
+            document.getElementById('ui-nombre-complejo').textContent = complejoNombre;
+            
+            // Acá en el futuro llamaremos a la API para cargar sus configuraciones...
+        });
+
+        function cerrarSesion() {
+            localStorage.clear();
+            window.location.href = 'login.html';
+        }
+
+        // 2. NAVEGACIÓN LATERAL
+        function cambiarVista(idVista, elementoMenu) {
+            // Ocultamos todas las vistas
+            document.querySelectorAll('.vista').forEach(el => el.classList.remove('activa'));
+            // Quitamos la clase 'active' de todos los botones del menú
+            document.querySelectorAll('nav li').forEach(el => el.classList.remove('active'));
+            
+            // Mostramos la vista seleccionada y remarcamos el botón
+            document.getElementById(`vista-${idVista}`).classList.add('activa');
+            elementoMenu.classList.add('active');
+        }
+
+        // Carga las configuraciones al entrar a la página
+        async function cargarConfiguraciones() {
+            const id = localStorage.getItem('complejo_id');
+            try {
+                const res = await fetch(`http://127.0.0.1:8000/api/complejos/${id}/settings`);
+                const data = await res.json();
+                if(data.settings) {
+                    const s = data.settings;
+                    // Rellenamos el form de Reglas
+                    if(s.horario_apertura) document.getElementById('conf-apertura').value = s.horario_apertura;
+                    if(s.horario_cierre) document.getElementById('conf-cierre').value = s.horario_cierre;
+                    if(s.duracion_turno_minutos) document.getElementById('conf-duracion').value = s.duracion_turno_minutos;
+                    if(s.minutos_tolerancia_pago) document.getElementById('conf-tolerancia').value = s.minutos_tolerancia_pago;
+                    if(s.tipo_cobro) document.getElementById('conf-tipo-cobro').value = s.tipo_cobro;
+                    
+                    // Rellenamos el form de Pagos
+                    if(s.titular_pago) document.getElementById('conf-titular').value = s.titular_pago;
+                    if(s.cbu_pago) document.getElementById('conf-cbu').value = s.cbu_pago;
+                    if(s.alias_pago) document.getElementById('conf-alias').value = s.alias_pago;
+                }
+            } catch (e) {
+                console.error("Error cargando configs:", e);
+            }
+        }
+
+        // Se ejecuta al apretar "Guardar" en cualquiera de los dos formularios
+        async function guardarSettings(event, modulo) {
+            event.preventDefault();
+            const id = localStorage.getItem('complejo_id');
+            let payload = {};
+
+            if (modulo === 'reglas') {
+                payload = {
+                    horario_apertura: document.getElementById('conf-apertura').value,
+                    horario_cierre: document.getElementById('conf-cierre').value,
+                    duracion_turno_minutos: parseInt(document.getElementById('conf-duracion').value),
+                    minutos_tolerancia_pago: parseInt(document.getElementById('conf-tolerancia').value),
+                    tipo_cobro: document.getElementById('conf-tipo-cobro').value
+                };
+            } else if (modulo === 'pagos') {
+                payload = {
+                    titular_pago: document.getElementById('conf-titular').value,
+                    cbu_pago: document.getElementById('conf-cbu').value,
+                    alias_pago: document.getElementById('conf-alias').value
+                };
+            }
+
+            try {
+                const res = await fetch(`http://127.0.0.1:8000/api/complejos/${id}/settings`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                const data = await res.json();
+                
+                if (data.error) alert("❌ " + data.error);
+                else alert(data.mensaje);
+            } catch (e) {
+                alert("⚠️ Error de conexión.");
+            }
+        }
+
+        // Hacemos que se carguen los datos ni bien se abre el panel
+        document.addEventListener("DOMContentLoaded", () => {
+            cargarConfiguraciones();
+            cargarCanchas();
+        });
+
+        // --- MÓDULO CANCHAS ---
+        function abrirModalCancha() {
+            document.getElementById('modal-cancha').style.display = 'flex';
+            document.getElementById('modal-cancha-titulo').textContent = 'Registrar Cancha';
+            document.getElementById('reg-cancha-id').value = ''; // Limpiamos el ID oculto
+        }
+
+        function cerrarModalCancha() {
+            document.getElementById('modal-cancha').style.display = 'none';
+            document.getElementById('form-cancha').reset();
+        }
+
+        function editarCancha(id, nombre, tipo, precio) {
+            document.getElementById('modal-cancha-titulo').textContent = 'Editar Cancha';
+            document.getElementById('reg-cancha-id').value = id;
+            document.getElementById('reg-cancha-nombre').value = nombre;
+            document.getElementById('reg-cancha-tipo').value = tipo;
+            document.getElementById('reg-cancha-precio').value = precio;
+            document.getElementById('modal-cancha').style.display = 'flex';
+        }
+
+        async function eliminarCancha(id) {
+            if (!confirm("⚠️ ¿Estás seguro de que querés borrar esta cancha? Esta acción no se puede deshacer.")) return;
+            
+            try {
+                const res = await fetch(`http://127.0.0.1:8000/api/canchas/${id}`, { method: 'DELETE' });
+                const data = await res.json();
+                if (data.error) alert("❌ " + data.error);
+                else {
+                    alert(data.mensaje);
+                    cargarCanchas();
+                }
+            } catch (e) {
+                alert("⚠️ Error de conexión.");
+            }
+        }
+
+        async function cargarCanchas() {
+            const idComplejo = localStorage.getItem('complejo_id');
+            const tbody = document.getElementById('tabla-canchas');
+            tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 20px;">Cargando inventario...</td></tr>';
+
+            try {
+                const res = await fetch(`http://127.0.0.1:8000/api/complejos/${idComplejo}/canchas`);
+                const data = await res.json();
+                
+                if (data.canchas && data.canchas.length > 0) {
+                    tbody.innerHTML = '';
+                    data.canchas.forEach(c => {
+                        const badge = c.activa 
+                            ? '<span style="background: rgba(16, 185, 129, 0.2); color: #10b981; padding: 4px 8px; border-radius: 12px; font-size: 12px; font-weight: bold;">Activa</span>'
+                            : '<span style="background: rgba(239, 68, 68, 0.2); color: #ef4444; padding: 4px 8px; border-radius: 12px; font-size: 12px; font-weight: bold;">Inactiva</span>';
+                        
+                        tbody.insertAdjacentHTML('beforeend', `
+                            <tr style="border-bottom: 1px solid #334155;">
+                                <td style="padding: 15px 10px;"><strong>${c.nombre}</strong></td>
+                                <td style="padding: 15px 10px; color: var(--text-muted);">${c.tipo}</td>
+                                <td style="padding: 15px 10px; color: #10b981;">$${c.precio}</td>
+                                <td style="padding: 15px 10px;">${badge}</td>
+                                <td style="padding: 15px 10px;">
+                                    <button onclick="editarCancha(${c.id}, '${c.nombre}', '${c.tipo}', ${c.precio})" style="background: transparent; border: none; cursor: pointer; font-size: 16px; margin-right: 10px;" title="Editar">✏️</button>
+                                    <button onclick="eliminarCancha(${c.id})" style="background: transparent; border: none; cursor: pointer; font-size: 16px;" title="Eliminar">🗑️</button>
+                                </td>
+                            </tr>
+                        `);
+                    });
+                } else {
+                    tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 20px; color: var(--text-muted);">No tenés canchas registradas.</td></tr>';
+                }
+            } catch (e) {
+                tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 20px; color: #ef4444;">Error de conexión.</td></tr>';
+            }
+        }
+
+        async function guardarCancha(event) {
+            event.preventDefault();
+            const idComplejo = localStorage.getItem('complejo_id');
+            const idCancha = document.getElementById('reg-cancha-id').value; // Chequeamos si hay ID oculto
+            
+            const payload = {
+                nombre: document.getElementById('reg-cancha-nombre').value,
+                tipo: document.getElementById('reg-cancha-tipo').value,
+                precio: parseInt(document.getElementById('reg-cancha-precio').value)
+            };
+
+            try {
+                let res;
+                // Si idCancha existe, es una EDICIÓN (PUT). Si está vacío, es NUEVA (POST).
+                if (idCancha) {
+                    res = await fetch(`http://127.0.0.1:8000/api/canchas/${idCancha}`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+                } else {
+                    res = await fetch(`http://127.0.0.1:8000/api/complejos/${idComplejo}/canchas`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+                }
+                
+                const data = await res.json();
+                
+                if (data.error) alert("❌ " + data.error);
+                else {
+                    alert(data.mensaje);
+                    cerrarModalCancha();
+                    cargarCanchas();
+                }
+            } catch (e) {
+                alert("⚠️ Error de conexión.");
+            }
+        }
+    </script>
+</body>
+</html>

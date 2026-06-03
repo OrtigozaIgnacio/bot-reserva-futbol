@@ -5,12 +5,22 @@ import uvicorn
 import asyncio
 from typing import Optional
 
-
-from database import obtener_configuracion_complejo, liberar_turnos_vencidos, obtener_turnos_disponibles, pre_reservar_turno, confirmar_turno, obtener_datos_turno, rechazar_turno
+from database import *
 from memory import obtener_usuario, actualizar_estado_usuario, limpiar_usuario, guardar_dato_temporal
 from bot_core import generar_respuesta
+from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI()
+
+# --- INICIO DEL ESCUDO CORS ---
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"], # En producción pondremos el dominio real de tu web
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+# --- FIN DEL ESCUDO CORS ---
 
 # --- INICIO DEL WORKER: CRONÓMETRO DE 15 MINUTOS ---
 async def verificar_turnos_vencidos():
@@ -40,6 +50,61 @@ class WebhookPayload(BaseModel):
     has_media: bool
     media_data: Optional[str] = None
     mime_type: Optional[str] = None
+
+# Agregá esto cerca de donde definiste tus otros modelos Pydantic
+class NuevoCliente(BaseModel):
+    nombre: str
+    email: str
+    password: str
+    token_maestro: str
+
+# Tu llave secreta (Cambiá esto por una contraseña difícil que solo vos sepas)
+TOKEN_SUPERADMIN = "Nacho_SaaS_2026_Admin" 
+
+class LoginCliente(BaseModel):
+    email: str
+    password: str
+
+class NuevaCancha(BaseModel):
+    nombre: str
+    tipo: str
+    precio: int
+
+@app.post("/api/login")
+async def login_cliente(datos: LoginCliente):
+    """Endpoint para que los dueños de los complejos inicien sesión."""
+    complejo = autenticar_complejo(datos.email, datos.password)
+    
+    if complejo:
+        return {
+            "mensaje": "✅ Acceso concedido.", 
+            "complejo_id": complejo["id"], 
+            "nombre": complejo["nombre"]
+        }
+    else:
+        return {"error": "Email o contraseña incorrectos."}
+
+@app.post("/api/superadmin/clientes")
+async def registrar_cliente(datos: NuevoCliente):
+    """Endpoint exclusivo para que el Superadmin registre nuevos negocios."""
+    if datos.token_maestro != TOKEN_SUPERADMIN:
+        return {"error": "Acceso denegado. Token maestro inválido."}
+        
+    exito = crear_complejo(datos.nombre, datos.email, datos.password)
+    
+    if exito:
+        return {"mensaje": f"✅ Negocio '{datos.nombre}' registrado correctamente."}
+    else:
+        return {"error": "Hubo un error al registrar el cliente en Supabase."}
+
+@app.get("/api/superadmin/clientes")
+async def listar_clientes(token_maestro: str):
+    """Endpoint para cargar la tabla principal del Superadmin."""
+    if token_maestro != TOKEN_SUPERADMIN:
+        return {"error": "Acceso denegado. Token maestro inválido."}
+        
+    clientes = obtener_todos_los_complejos()
+    return {"clientes": clientes}
 
 @app.post("/webhook")
 async def handle_whatsapp_message(payload: WebhookPayload):
@@ -72,8 +137,8 @@ async def handle_whatsapp_message(payload: WebhookPayload):
             limpiar_usuario(telefono_jugador) # Reseteamos la memoria del jugador
             return {
                 "reply": f"✅ Turno {turno_id} aprobado.",
-                "notify_owner": { # Usamos este canal paralelo para avisarle al jugador
-                    "phone": telefono_jugador,
+                "notify_owner": { 
+                    "phones": [telefono_jugador], # Formato de array
                     "message": f"¡Comprobante validado! ✅ Tu turno para {datos_turno['cancha_nombre']} está confirmado oficialmente. ¡Te esperamos!"
                 }
             }
@@ -83,7 +148,7 @@ async def handle_whatsapp_message(payload: WebhookPayload):
             return {
                 "reply": f"❌ Turno {turno_id} rechazado y liberado.",
                 "notify_owner": {
-                    "phone": telefono_jugador,
+                    "phones": [telefono_jugador], # Formato de array
                     "message": "❌ Tu pago fue rechazado por administración. El turno ha sido liberado. Escribí 'Hola' si deseás intentar nuevamente."
                 }
             }
@@ -139,15 +204,30 @@ async def handle_whatsapp_message(payload: WebhookPayload):
             turno_id = usuario["datos_temporales"].get("turno_id")
             actualizar_estado_usuario(telefono_cliente, "EN_REVISION")
             
-            # Buscamos el número del dueño para alertarlo
+            # Buscamos los números de los dueños para alertarlos
             datos_settings = config_complejo.get("settings", {})
             settings = datos_settings[0] if isinstance(datos_settings, list) else datos_settings
-            numero_dueno = settings.get("notification_number", "549297XXXXXXX@c.us") # Por defecto, si falla la BD
+            
+            # 1. Extraemos la lista del JSONB
+            numeros_alerta = settings.get("notification_numbers", [])
+            
+            # 2. Fallback: si la lista está vacía, usamos el número viejo o uno por defecto
+            if not numeros_alerta:
+                numero_viejo = settings.get("notification_number", "5492975949503")
+                numeros_alerta = [numero_viejo]
+                
+            # 3. Escudo de Formato Automático
+            numeros_formateados = []
+            for num in numeros_alerta:
+                num_str = str(num).strip()
+                if "@" not in num_str:
+                    num_str = f"{num_str}@c.us"
+                numeros_formateados.append(num_str)
             
             return {
                 "reply": "Recibimos tu comprobante. ⏳ Está en revisión por administración. Te confirmamos a la brevedad.",
                 "notify_owner": {
-                    "phone": numero_dueno,
+                    "phones": numeros_formateados, # Pasamos la lista limpia
                     "message": f"🚨 *NUEVA SEÑA RECIBIDA* 🚨\n\n*Turno ID:* {turno_id}\n*Teléfono:* {telefono_cliente}\n\nPara aprobar respondé:\n*APROBAR {turno_id}*\n\nPara rechazar respondé:\n*RECHAZAR {turno_id}*",
                     "media_data": payload.media_data,
                     "mime_type": payload.mime_type
@@ -161,6 +241,50 @@ async def handle_whatsapp_message(payload: WebhookPayload):
 
     elif estado_actual == "EN_REVISION":
         return {"reply": "Tu comprobante sigue en revisión. ⏳ Por favor, aguardá unos minutos más."}
+
+@app.get("/api/complejos/{complejo_id}/settings")
+async def get_settings(complejo_id: int):
+    """Devuelve las configuraciones al frontend para rellenar los formularios."""
+    settings = obtener_settings_complejo(complejo_id)
+    return {"settings": settings}
+
+@app.put("/api/complejos/{complejo_id}/settings")
+async def update_settings(complejo_id: int, datos: dict):
+    """Recibe datos desde el panel web y actualiza el JSON."""
+    exito = actualizar_settings_complejo(complejo_id, datos)
+    if exito:
+        return {"mensaje": "✅ Configuraciones guardadas exitosamente."}
+    return {"error": "Error al guardar en la base de datos."}
+
+@app.get("/api/complejos/{complejo_id}/canchas")
+async def listar_canchas(complejo_id: int):
+    """Devuelve la lista de canchas al panel web del dueño."""
+    canchas = obtener_canchas_complejo(complejo_id)
+    return {"canchas": canchas}
+
+@app.post("/api/complejos/{complejo_id}/canchas")
+async def agregar_cancha(complejo_id: int, datos: NuevaCancha):
+    """Recibe los datos del panel web y guarda la nueva cancha."""
+    exito = crear_cancha(complejo_id, datos.nombre, datos.tipo, datos.precio)
+    if exito:
+        return {"mensaje": f"✅ Cancha '{datos.nombre}' agregada al inventario."}
+    return {"error": "Error al guardar la cancha en la base de datos."}
+
+@app.put("/api/canchas/{cancha_id}")
+async def editar_cancha_api(cancha_id: int, datos: NuevaCancha):
+    """Recibe los datos corregidos y los guarda en la base de datos."""
+    exito = actualizar_cancha(cancha_id, datos.nombre, datos.tipo, datos.precio)
+    if exito:
+        return {"mensaje": "✅ Cancha actualizada correctamente."}
+    return {"error": "Error al actualizar la cancha."}
+
+@app.delete("/api/canchas/{cancha_id}")
+async def borrar_cancha_api(cancha_id: int):
+    """Elimina la cancha seleccionada."""
+    exito = eliminar_cancha(cancha_id)
+    if exito:
+        return {"mensaje": "✅ Cancha eliminada correctamente."}
+    return {"error": "Error al eliminar la cancha."}
 
 if __name__ == "__main__":
     print("🚀 Iniciando SaaS Core en puerto 8000...")

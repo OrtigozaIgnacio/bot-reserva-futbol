@@ -2,6 +2,7 @@ import os
 from supabase import create_client, Client
 from dotenv import load_dotenv
 from datetime import datetime, timedelta, timezone
+import bcrypt
 
 load_dotenv()
 
@@ -133,4 +134,125 @@ def rechazar_turno(turno_id: int) -> bool:
         return bool(res.data)
     except Exception as e:
         print(f"❌ [DATABASE] Error rechazando el turno: {e}")
+        return False
+
+def crear_complejo(nombre: str, email: str, password_plana: str) -> bool:
+    """Crea un nuevo cliente en la base de datos con contraseña encriptada."""
+    try:
+        # Encriptamos la contraseña para que ni siquiera vos la veas en texto plano en Supabase
+        salt = bcrypt.gensalt()
+        password_hash = bcrypt.hashpw(password_plana.encode('utf-8'), salt).decode('utf-8')
+        
+        res = supabase.table('complejos').insert({
+            'nombre_negocio': nombre,
+            'email_login': email,
+            'password_hash': password_hash
+        }).execute()
+        
+        return bool(res.data)
+    except Exception as e:
+        print(f"❌ [DATABASE] Error creando complejo: {e}")
+        return False
+
+def obtener_todos_los_complejos() -> list:
+    """Extrae la lista de clientes registrados para el panel de Superadmin."""
+    try:
+        # Solo traemos los datos esenciales, no mandamos las contraseñas por red
+        res = supabase.table('complejos').select('id, nombre_negocio, email_login, wa_session_status, bot_encendido').order('id').execute()
+        return res.data if res.data else []
+    except Exception as e:
+        print(f"❌ [DATABASE] Error obteniendo lista de complejos: {e}")
+        return []
+
+def autenticar_complejo(email: str, password_plana: str) -> dict:
+    """Verifica el email y la contraseña del cliente."""
+    try:
+        # Buscamos al usuario por su email
+        res = supabase.table('complejos').select('id, nombre_negocio, password_hash').eq('email_login', email).execute()
+        
+        if not res.data:
+            return None # El email no existe
+            
+        complejo = res.data[0]
+        
+        # Comparamos la contraseña plana con el hash de Supabase
+        if bcrypt.checkpw(password_plana.encode('utf-8'), complejo['password_hash'].encode('utf-8')):
+            return {"id": complejo['id'], "nombre": complejo['nombre_negocio']}
+            
+        return None # La contraseña es incorrecta
+    except Exception as e:
+        print(f"❌ [DATABASE] Error en autenticación: {e}")
+        return None
+
+def obtener_settings_complejo(complejo_id: int) -> dict:
+    """Extrae el JSON de configuraciones de un negocio."""
+    try:
+        res = supabase.table('complejos').select('settings').eq('id', complejo_id).execute()
+        if res.data and res.data[0]['settings']:
+            return res.data[0]['settings']
+        return {}
+    except Exception as e:
+        print(f"❌ [DATABASE] Error obteniendo settings: {e}")
+        return {}
+
+def actualizar_settings_complejo(complejo_id: int, nuevos_datos: dict) -> bool:
+    """Actualiza campos específicos dentro del JSONB de settings."""
+    try:
+        # 1. Traemos los datos actuales para no borrar lo que ya estaba
+        settings_actuales = obtener_settings_complejo(complejo_id)
+        
+        # 2. Mezclamos (actualizamos) los datos viejos con los nuevos
+        settings_actuales.update(nuevos_datos)
+        
+        # 3. Guardamos el JSON completo de nuevo
+        res = supabase.table('complejos').update({'settings': settings_actuales}).eq('id', complejo_id).execute()
+        return bool(res.data)
+    except Exception as e:
+        print(f"❌ [DATABASE] Error actualizando settings: {e}")
+        return False
+
+def obtener_canchas_complejo(complejo_id: int) -> list:
+    """Extrae el inventario de canchas de un complejo específico."""
+    try:
+        # Traemos todas las canchas de ese cliente ordenadas por ID
+        res = supabase.table('canchas').select('*').eq('complejo_id', complejo_id).order('id').execute()
+        return res.data if res.data else []
+    except Exception as e:
+        print(f"❌ [DATABASE] Error obteniendo canchas: {e}")
+        return []
+
+def crear_cancha(complejo_id: int, nombre: str, tipo: str, precio: int) -> bool:
+    """Inserta una nueva cancha en el inventario del cliente."""
+    try:
+        res = supabase.table('canchas').insert({
+            'complejo_id': complejo_id,
+            'nombre': nombre,
+            'tipo': tipo,
+            'precio': precio
+        }).execute()
+        return bool(res.data)
+    except Exception as e:
+        print(f"❌ [DATABASE] Error creando cancha: {e}")
+        return False
+    
+def actualizar_cancha(cancha_id: int, nombre: str, tipo: str, precio: int) -> bool:
+    """Modifica los datos de una cancha existente."""
+    try:
+        res = supabase.table('canchas').update({
+            'nombre': nombre,
+            'tipo': tipo,
+            'precio': precio
+        }).eq('id', cancha_id).execute()
+        return bool(res.data)
+    except Exception as e:
+        print(f"❌ [DATABASE] Error actualizando cancha: {e}")
+        return False
+
+def eliminar_cancha(cancha_id: int) -> bool:
+    """Borra permanentemente una cancha del inventario."""
+    try:
+        res = supabase.table('canchas').delete().eq('id', cancha_id).execute()
+        return bool(res.data)
+    except Exception as e:
+        print(f"❌ [DATABASE] Error eliminando cancha: {e}")
         return False

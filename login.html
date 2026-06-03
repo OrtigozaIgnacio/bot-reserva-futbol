@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Iniciar Sesión - SaaS Fútbol</title>
+    <style>
+        body { 
+            margin: 0; font-family: system-ui, sans-serif; 
+            background: #0f172a; color: #f8fafc; 
+            display: flex; height: 100vh; justify-content: center; align-items: center; 
+        }
+        .login-box {
+            background: #1e293b; padding: 40px; border-radius: 12px;
+            width: 100%; max-width: 350px; border: 1px solid #334155;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+        }
+        .brand { text-align: center; font-size: 28px; font-weight: bold; margin-bottom: 30px; }
+        .brand span { color: #3b82f6; }
+        
+        .form-group { margin-bottom: 20px; }
+        .form-group label { display: block; margin-bottom: 8px; color: #94a3b8; font-size: 14px; }
+        .form-group input { 
+            width: 100%; padding: 12px; background: #0f172a; 
+            border: 1px solid #334155; color: white; border-radius: 6px; 
+            box-sizing: border-box; font-size: 15px;
+        }
+        .form-group input:focus { outline: none; border-color: #3b82f6; }
+        
+        .btn-primary { 
+            width: 100%; background: #3b82f6; color: white; border: none; 
+            padding: 12px; border-radius: 6px; font-size: 16px; font-weight: bold; 
+            cursor: pointer; transition: 0.2s; margin-top: 10px;
+        }
+        .btn-primary:hover { background: #2563eb; }
+        
+        #mensaje-error { color: #ef4444; font-size: 14px; text-align: center; margin-top: 15px; display: none; }
+    </style>
+</head>
+<body>
+
+    <div class="login-box">
+        <div class="brand">SaaS<span>Fútbol</span></div>
+        <form id="login-form" onsubmit="procesarLogin(event)">
+            <div class="form-group">
+                <label>Email del Complejo</label>
+                <input type="email" id="login-email" required placeholder="tu@negocio.com">
+            </div>
+            <div class="form-group">
+                <label>Contraseña</label>
+                <input type="password" id="login-password" required placeholder="••••••••">
+            </div>
+            <button type="submit" class="btn-primary">Ingresar al Panel</button>
+            <div id="mensaje-error"></div>
+        </form>
+    </div>
+
+    <script>
+        async function procesarLogin(event) {
+            event.preventDefault();
+            
+            const email = document.getElementById('login-email').value;
+            const password = document.getElementById('login-password').value;
+            const msjError = document.getElementById('mensaje-error');
+            
+            msjError.style.display = 'none';
+
+            try {
+                const response = await fetch('http://127.0.0.1:8000/api/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, password })
+                });
+                
+                const data = await response.json();
+                
+                if (data.error) {
+                    msjError.textContent = data.error;
+                    msjError.style.display = 'block';
+                } else {
+                    // ¡Éxito! Guardamos el ID del complejo en la memoria del navegador
+                    localStorage.setItem('complejo_id', data.complejo_id);
+                    localStorage.setItem('complejo_nombre', data.nombre);
+                    
+                    // Redirigimos al cliente a su panel principal
+                    window.location.href = 'home.html';
+                }
+            } catch (err) {
+                msjError.textContent = "Error de conexión con el servidor.";
+                msjError.style.display = 'block';
+            }
+        }
+    </script>
+</body>
+</html>

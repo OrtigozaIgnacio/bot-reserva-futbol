@@ -1,5 +1,5 @@
 require('dotenv').config({ path: '../.env' });
-const { Client, LocalAuth } = require('whatsapp-web.js');
+const { Client, LocalAuth, MessageMedia } = require('whatsapp-web.js');
 const qrcode = require('qrcode-terminal');
 const axios = require('axios');
 
@@ -60,22 +60,42 @@ client.on('message', async (msg) => {
              client.sendMessage(msg.from, botReply);
         }
 
-        // 4. NUEVO: Alerta paralela al Dueño (Si Python lo solicita)
+        // 4. NUEVO: Alerta paralela a todos los Dueños (Si Python lo solicita)
         const ownerNotification = response.data.notify_owner;
         if (ownerNotification) {
-             const ownerPhone = ownerNotification.phone; 
-             if (ownerNotification.media_data) {
-                 // Extraemos la extensión real directamente del mime_type 
-                 // (Ej: si es "image/png", recorta y guarda solo "png")
-                 const extension = ownerNotification.mime_type.split('/')[1].split(';')[0];
-                 const fileName = `comprobante.${extension}`;
+             const phoneList = ownerNotification.phones || [];
+             
+             for (const ownerPhone of phoneList) {
+                 if (!ownerPhone) continue;
                  
-                 // Reconstruimos el archivo respetando su formato original 100%
-                 const mediaToSend = new MessageMedia(ownerNotification.mime_type, ownerNotification.media_data, fileName);
-                 
-                 client.sendMessage(ownerPhone, mediaToSend, { caption: ownerNotification.message });
-             } else {
-                 client.sendMessage(ownerPhone, ownerNotification.message);
+                 try {
+                     // 1. Limpiamos la basura (@c.us, @lid, espacios, signos +)
+                     // Dejamos únicamente los números puros.
+                     const cleanNumber = ownerPhone.replace(/\D/g, ''); 
+                     
+                     // 2. Le preguntamos a Meta cuál es el ID interno exacto de este número
+                     const registeredUser = await client.getNumberId(cleanNumber);
+                     
+                     if (!registeredUser) {
+                         console.log(`⚠️ WhatsApp dice que el número ${cleanNumber} no existe.`);
+                         continue; // Saltamos al siguiente número de la lista
+                     }
+                     
+                     // 3. Este es el ID perfecto y seguro (con o sin el 9, WhatsApp lo decide)
+                     const safeJid = registeredUser._serialized; 
+                     
+                     if (ownerNotification.media_data) {
+                         const extension = ownerNotification.mime_type.split('/')[1].split(';')[0];
+                         const fileName = `comprobante.${extension}`;
+                         const mediaToSend = new MessageMedia(ownerNotification.mime_type, ownerNotification.media_data, fileName);
+                         
+                         await client.sendMessage(safeJid, mediaToSend, { caption: ownerNotification.message });
+                     } else {
+                         await client.sendMessage(safeJid, ownerNotification.message);
+                     }
+                 } catch (err) {
+                     console.log(`❌ Error interno al notificar a ${ownerPhone}:`, err.message);
+                 }
              }
         }
         

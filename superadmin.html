@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SaaS Control Center - Superadmin</title>
+    <style>
+        :root {
+            --bg-dark: #0f172a;
+            --panel-bg: #1e293b;
+            --accent: #3b82f6;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+        }
+        body { margin: 0; font-family: system-ui, sans-serif; background: var(--bg-dark); color: var(--text-main); display: flex; height: 100vh; }
+        
+        /* Sidebar lateral */
+        aside { width: 260px; background: var(--panel-bg); padding: 20px; border-right: 1px solid #334155; }
+        .brand { font-size: 24px; font-weight: bold; margin-bottom: 40px; color: white; }
+        .brand span { color: var(--accent); }
+        nav ul { list-style: none; padding: 0; }
+        nav li { padding: 12px 15px; margin-bottom: 8px; border-radius: 8px; cursor: pointer; color: var(--text-muted); transition: 0.2s; }
+        nav li:hover, nav li.active { background: #334155; color: white; }
+        
+        /* Contenido principal */
+        main { flex: 1; padding: 40px; overflow-y: auto; }
+        .header-flex { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; }
+        
+        /* Botones y Tablas */
+        .btn-primary { background: var(--accent); color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-weight: bold; }
+        .btn-primary:hover { background: #2563eb; }
+        
+        table { width: 100%; border-collapse: collapse; background: var(--panel-bg); border-radius: 8px; overflow: hidden; }
+        th, td { padding: 15px; text-align: left; border-bottom: 1px solid #334155; }
+        th { background: #0f172a; color: var(--text-muted); font-size: 13px; text-transform: uppercase; }
+        
+        /* Status Badges */
+        .status-badge { padding: 4px 8px; border-radius: 12px; font-size: 12px; font-weight: bold; }
+        .status-online { background: rgba(34, 197, 94, 0.2); color: #4ade80; }
+        .status-offline { background: rgba(239, 68, 68, 0.2); color: #f87171; }
+
+        /* Estilos del Modal */
+        .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); justify-content: center; align-items: center; z-index: 1000; }
+        .modal-content { background: var(--panel-bg); padding: 30px; border-radius: 8px; width: 400px; border: 1px solid #334155; }
+        .form-group { margin-bottom: 15px; }
+        .form-group label { display: block; margin-bottom: 5px; color: var(--text-muted); font-size: 14px; }
+        .form-group input { width: 100%; padding: 10px; background: var(--bg-dark); border: 1px solid #334155; color: white; border-radius: 5px; box-sizing: border-box; }
+        .btn-secondary { background: transparent; color: var(--text-muted); border: 1px solid #334155; padding: 10px 20px; border-radius: 6px; cursor: pointer; }
+        .btn-secondary:hover { background: #334155; color: white; }
+    </style>
+</head>
+<body>
+
+    <aside>
+        <div class="brand">SaaS<span>Futbol</span></div>
+        <nav>
+            <ul>
+                <li class="active">🏢 Negocios Activos</li>
+                <li>📊 Métricas Globales</li>
+                <li>⚙️ Ajustes de Sistema</li>
+            </ul>
+        </nav>
+    </aside>
+
+    <main>
+        <div class="header-flex">
+            <div>
+                <h1 style="margin: 0;">Gestión de Clientes</h1>
+                <p style="color: var(--text-muted); margin-top: 5px;">Administra los complejos deportivos y sus instancias de WhatsApp.</p>
+            </div>
+            <button class="btn-primary" onclick="abrirModalNuevoCliente()">+ Registrar Negocio</button>
+        </div>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Nombre del Complejo</th>
+                    <th>Email (Login)</th>
+                    <th>Estado WhatsApp</th>
+                    <th>Acciones</th>
+                </tr>
+            </thead>
+            <tbody id="tabla-clientes">
+                </tbody>
+        </table>
+    </main>
+<div id="modal-registro" class="modal-overlay">
+        <div class="modal-content">
+            <h2 style="margin-top: 0;">Registrar Nuevo Negocio</h2>
+            <form id="form-registro" onsubmit="registrarNegocio(event)">
+                <div class="form-group">
+                    <label>Nombre del Complejo</label>
+                    <input type="text" id="reg-nombre" required placeholder="Ej: La Canchita FC">
+                </div>
+                <div class="form-group">
+                    <label>Email (Login del cliente)</label>
+                    <input type="email" id="reg-email" required placeholder="Ej: admin@lacanchita.com">
+                </div>
+                <div class="form-group">
+                    <label>Contraseña Provisoria</label>
+                    <input type="password" id="reg-password" required placeholder="Ej: cliente123">
+                </div>
+                <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 25px;">
+                    <button type="button" class="btn-secondary" onclick="cerrarModal()">Cancelar</button>
+                    <button type="submit" class="btn-primary">Crear Cuenta</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    <script>
+        function abrirModalNuevoCliente() {
+            document.getElementById('modal-registro').style.display = 'flex';
+        }
+
+        function cerrarModal() {
+            document.getElementById('modal-registro').style.display = 'none';
+            document.getElementById('form-registro').reset(); // Limpia los campos
+        }
+
+        async function registrarNegocio(event) {
+            event.preventDefault(); // Evita que la página se recargue
+            
+            const nombre = document.getElementById('reg-nombre').value;
+            const email = document.getElementById('reg-email').value;
+            const password = document.getElementById('reg-password').value;
+            
+            // La misma llave maestra que pusimos en tu main.py
+            const token_maestro = "Nacho_SaaS_2026_Admin"; 
+
+            try {
+                // Ajustá esta URL si tu FastAPI corre en otro puerto
+                const response = await fetch('http://127.0.0.1:8000/api/superadmin/clientes', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ nombre, email, password, token_maestro })
+                });
+                
+                const data = await response.json();
+                
+                if (data.error) {
+                    alert("❌ Error: " + data.error);
+                } else {
+                    alert(data.mensaje);
+                    cerrarModal();
+                    cargarClientes(); // Recarga la tabla automáticamente
+                }
+            } catch (err) {
+                alert("⚠️ Error de conexión con el servidor backend.");
+                console.error(err);
+            }
+        }
+        async function cargarClientes() {
+            const tbody = document.getElementById('tabla-clientes');
+            tbody.innerHTML = '<tr><td colspan="5" style="text-align: center;">Cargando clientes...</td></tr>';
+            
+            const token_maestro = "Nacho_SaaS_2026_Admin";
+            
+            try {
+                const response = await fetch(`http://127.0.0.1:8000/api/superadmin/clientes?token_maestro=${token_maestro}`);
+                const data = await response.json();
+                
+                if (data.error) {
+                    tbody.innerHTML = `<tr><td colspan="5" style="color: #ef4444;">${data.error}</td></tr>`;
+                    return;
+                }
+                
+                tbody.innerHTML = ''; // Limpiamos el mensaje de carga
+                
+                data.clientes.forEach(cliente => {
+                    // Definimos colores según el estado de WhatsApp
+                    let badgeClass = cliente.wa_session_status === 'CONNECTED' ? 'status-online' : 'status-offline';
+                    let statusText = cliente.wa_session_status === 'CONNECTED' ? 'Conectado' : 'Desconectado';
+                    
+                    const fila = `
+                        <tr>
+                            <td>${cliente.id}</td>
+                            <td><strong>${cliente.nombre_negocio}</strong></td>
+                            <td>${cliente.email_login}</td>
+                            <td><span class="status-badge ${badgeClass}">${statusText}</span></td>
+                            <td>
+                                <button class="btn-secondary" style="padding: 6px 12px; font-size: 12px;">Desactivar</button>
+                            </td>
+                        </tr>
+                    `;
+                    tbody.insertAdjacentHTML('beforeend', fila);
+                });
+                
+            } catch (err) {
+                tbody.innerHTML = `<tr><td colspan="5" style="color: #ef4444;">Error de conexión con el servidor.</td></tr>`;
+                console.error(err);
+            }
+        }
+
+        // Hacemos que la tabla se cargue sola apenas abrís la página
+        document.addEventListener("DOMContentLoaded", cargarClientes);
+    </script>
+</body>
+</html>
