@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Mi Complejo - SaaS Fútbol</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <style>
         :root {
             --bg-dark: #0f172a;
@@ -128,6 +129,11 @@
                     </div>
                     
                     <div style="margin-bottom: 15px;">
+                        <label style="display: block; margin-bottom: 5px; font-size: 14px; color: var(--text-muted);">Dirección o Link de Google Maps</label>
+                        <input type="text" id="conf-ubicacion" placeholder="Ej: Av. San Martín 1234 o https://maps.app.goo.gl/..." style="width: 100%; padding: 10px; background: var(--bg-dark); border: 1px solid #334155; color: white; border-radius: 5px; box-sizing: border-box;">
+                    </div>
+
+                    <div style="margin-bottom: 15px;">
                         <label style="display: block; margin-bottom: 5px; font-size: 14px; color: var(--text-muted);">Duración del turno (minutos)</label>
                         <input type="number" id="conf-duracion" value="60" required style="width: 100%; padding: 10px; background: var(--bg-dark); border: 1px solid #334155; color: white; border-radius: 5px; box-sizing: border-box;">
                     </div>
@@ -167,6 +173,11 @@
                         <label style="display: block; margin-bottom: 5px; font-size: 14px; color: var(--text-muted);">Alias</label>
                         <input type="text" id="conf-alias" placeholder="CANCHA.FUTBOL" required style="width: 100%; padding: 10px; background: var(--bg-dark); border: 1px solid #334155; color: white; border-radius: 5px; box-sizing: border-box;">
                     </div>
+                    <div style="margin-bottom: 25px;">
+                        <label style="display: block; margin-bottom: 5px; font-size: 14px; color: var(--text-muted);">WhatsApp para Alertas de Pago (Con código de área, sin el +)</label>
+                        <input type="text" id="conf-alerta-wpp" placeholder="Ej: 5492975949503" required style="width: 100%; padding: 10px; background: var(--bg-dark); border: 1px solid #334155; color: white; border-radius: 5px; box-sizing: border-box;">
+                        <small style="color: var(--text-muted); font-size: 12px; display: block; margin-top: 5px;">A este número el bot le reenviará los comprobantes que manden los jugadores para su aprobación.</small>
+                    </div>
                     <button type="submit" class="btn-primary">Guardar Datos Bancarios</button>
                 </form>
             </div>
@@ -181,11 +192,7 @@
                     <span style="color: #333;">Generando QR...</span>
                 </div>
                 
-                <div style="margin-top: 30px; text-align: left; border-top: 1px solid #334155; padding-top: 20px;">
-                    <h4>Números Autorizados (Dueños)</h4>
-                    <p style="color: var(--text-muted); font-size: 13px;">Los números que agregues aquí recibirán las fotos de los comprobantes para aprobarlos.</p>
-                    <button class="btn-primary" style="font-size: 12px;">+ Añadir Número</button>
-                </div>
+                
             </div>
         </div>
     </main>
@@ -236,6 +243,7 @@
                     // Rellenamos el form de Reglas
                     if(s.horario_apertura) document.getElementById('conf-apertura').value = s.horario_apertura;
                     if(s.horario_cierre) document.getElementById('conf-cierre').value = s.horario_cierre;
+                    if(s.ubicacion) document.getElementById('conf-ubicacion').value = s.ubicacion;
                     if(s.duracion_turno_minutos) document.getElementById('conf-duracion').value = s.duracion_turno_minutos;
                     if(s.minutos_tolerancia_pago) document.getElementById('conf-tolerancia').value = s.minutos_tolerancia_pago;
                     if(s.tipo_cobro) document.getElementById('conf-tipo-cobro').value = s.tipo_cobro;
@@ -244,6 +252,11 @@
                     if(s.titular_pago) document.getElementById('conf-titular').value = s.titular_pago;
                     if(s.cbu_pago) document.getElementById('conf-cbu').value = s.cbu_pago;
                     if(s.alias_pago) document.getElementById('conf-alias').value = s.alias_pago;
+                    
+                    // NUEVO: Extraemos el primer número del array de alertas
+                    if(s.numeros_alerta && s.numeros_alerta.length > 0) {
+                        document.getElementById('conf-alerta-wpp').value = s.numeros_alerta[0];
+                    }
                 }
             } catch (e) {
                 console.error("Error cargando configs:", e);
@@ -258,6 +271,7 @@
 
             if (modulo === 'reglas') {
                 payload = {
+                    ubicacion: document.getElementById('conf-ubicacion').value, // <-- NUEVA LÍNEA
                     horario_apertura: document.getElementById('conf-apertura').value,
                     horario_cierre: document.getElementById('conf-cierre').value,
                     duracion_turno_minutos: parseInt(document.getElementById('conf-duracion').value),
@@ -265,10 +279,14 @@
                     tipo_cobro: document.getElementById('conf-tipo-cobro').value
                 };
             } else if (modulo === 'pagos') {
+                const numeroAlerta = document.getElementById('conf-alerta-wpp').value.trim();
+                
                 payload = {
                     titular_pago: document.getElementById('conf-titular').value,
                     cbu_pago: document.getElementById('conf-cbu').value,
-                    alias_pago: document.getElementById('conf-alias').value
+                    alias_pago: document.getElementById('conf-alias').value,
+                    // Guardamos el número dentro de una lista [] para mantener compatibilidad con main.py
+                    numeros_alerta: numeroAlerta ? [numeroAlerta] : [] 
                 };
             }
 
@@ -407,6 +425,52 @@
                 alert("⚠️ Error de conexión.");
             }
         }
+        // --- MÓDULO WHATSAPP (PUENTE NODE.JS) ---
+        let intervaloQr = null;
+
+        async function consultarEstadoBot() {
+            const id = localStorage.getItem('complejo_id');
+            const container = document.getElementById('qr-container');
+
+            try {
+                // Consultamos a Node.js (que corre en el puerto 3000)
+                const res = await fetch(`http://127.0.0.1:3000/api/bot/${id}/status`);
+                const data = await res.json();
+                
+                if (data.status === 'CONECTADO') {
+                    container.innerHTML = '<div style="color: #10b981; font-weight: bold; text-align: center; font-size: 18px;">✅ ¡Bot Conectado y Operativo!</div>';
+                } else if (data.status === 'QR_LISTO' && data.qr) {
+                    container.innerHTML = ''; // Limpiamos el texto
+                    new QRCode(container, {
+                        text: data.qr,
+                        width: 230,
+                        height: 230,
+                        colorDark : "#000000",
+                        colorLight : "#ffffff"
+                    });
+                } else if (data.status === 'INICIANDO') {
+                    container.innerHTML = '<div style="color: #f59e0b; text-align: center; font-weight: bold;">Generando código QR... Aguardá unos segundos.</div>';
+                } else {
+                    container.innerHTML = '<button class="btn-primary" onclick="encenderBot()">Encender Motor de WhatsApp</button>';
+                }
+            } catch(e) {
+                container.innerHTML = '<div style="color: #ef4444; font-weight: bold; text-align: center;">Servidor de WhatsApp apagado.</div>';
+            }
+        }
+
+        async function encenderBot() {
+            const id = localStorage.getItem('complejo_id');
+            document.getElementById('qr-container').innerHTML = '<div style="color: #f59e0b; text-align: center;">Enviando señal de encendido...</div>';
+            
+            try {
+                await fetch(`http://127.0.0.1:3000/api/bot/${id}/start`, { method: 'POST' });
+            } catch (e) {
+                alert("Error al intentar encender el bot.");
+            }
+        }
+
+        // Bucle automático: Chequea el estado cada 3 segundos
+        setInterval(consultarEstadoBot, 3000);
     </script>
 </body>
 </html>

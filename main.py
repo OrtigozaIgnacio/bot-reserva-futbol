@@ -132,14 +132,53 @@ async def handle_whatsapp_message(payload: WebhookPayload):
             
         telefono_jugador = datos_turno['telefono_cliente']
         
+        # 🛡️ Pasamos el ID tal cual está en la base de datos (sea @c.us o @lid)
+        telefono_limpio = str(telefono_jugador).strip()
+        
         if accion == "APROBAR":
             confirmar_turno(turno_id)
-            limpiar_usuario(telefono_jugador) # Reseteamos la memoria del jugador
+            limpiar_usuario(telefono_jugador) 
+            
+            # 1. Extraemos los datos dinámicos del complejo
+            settings = config_complejo.get("settings", {})
+            ubicacion = settings.get("ubicacion", "Dirección no especificada")
+            nombre_complejo = config_complejo.get("nombre_negocio", "Nuestro Complejo")
+            nombre_jugador = datos_turno.get("cliente_nombre", "Jugador")
+            cancha = datos_turno.get("cancha_nombre", "Cancha")
+            
+            # 2. Parseamos la fecha a Hora Argentina
+            from datetime import datetime, timezone, timedelta
+            zona_argentina = timezone(timedelta(hours=-3))
+            try:
+                # Reemplazamos la Z de Supabase para evitar errores de parseo
+                fecha_utc = datetime.fromisoformat(datos_turno['fecha_hora'].replace('Z', '+00:00'))
+                fecha_ar = fecha_utc.astimezone(zona_argentina)
+                fecha_str = fecha_ar.strftime("%d/%m/%Y")
+                hora_str = fecha_ar.strftime("%H:%M hs")
+            except:
+                fecha_str = "Fecha confirmada"
+                hora_str = "Horario confirmado"
+                
+            # 3. Armamos el diseño del ticket
+            ticket_msg = f"""✅ *¡TURNO CONFIRMADO!* ✅
+
+Hola {nombre_jugador}, tu pago ha sido aprobado exitosamente. Acá tenés tu ticket de acceso:
+
+🏟️ *Complejo:* {nombre_complejo}
+⚽ *Cancha:* {cancha}
+📅 *Fecha:* {fecha_str}
+⏰ *Horario:* {hora_str}
+📍 *Ubicación:* {ubicacion}
+🎫 *Ticket ID:* #{turno_id}
+
+¡Te esperamos! Llevá este mensaje por cualquier eventualidad."""
+
             return {
-                "reply": f"✅ Turno {turno_id} aprobado.",
+                "reply": f"✅ Turno {turno_id} aprobado exitosamente. Se le envió el ticket al cliente.",
                 "notify_owner": { 
-                    "phones": [telefono_jugador], # Formato de array
-                    "message": f"¡Comprobante validado! ✅ Tu turno para {datos_turno['cancha_nombre']} está confirmado oficialmente. ¡Te esperamos!"
+                    # Al ser de tipo TEXT en la base de datos, el teléfono viaja perfecto sin decimales
+                    "phones": [telefono_jugador], 
+                    "message": ticket_msg
                 }
             }
         else:
@@ -148,8 +187,8 @@ async def handle_whatsapp_message(payload: WebhookPayload):
             return {
                 "reply": f"❌ Turno {turno_id} rechazado y liberado.",
                 "notify_owner": {
-                    "phones": [telefono_jugador], # Formato de array
-                    "message": "❌ Tu pago fue rechazado por administración. El turno ha sido liberado. Escribí 'Hola' si deseás intentar nuevamente."
+                    "phones": [telefono_jugador],
+                    "message": f"❌ Hola, te informamos que tu pago para el turno de {datos_turno['cancha_nombre']} no pudo ser validado y el turno fue liberado.\n\nPor favor, escribí 'Hola' para intentar generar una nueva reserva."
                 }
             }
 
@@ -179,8 +218,6 @@ async def handle_whatsapp_message(payload: WebhookPayload):
         return {"reply": respuesta_ia}
 
     elif estado_actual == "ESPERANDO_DATOS":
-        datos_settings = config_complejo.get("settings", {})
-        settings = datos_settings[0] if isinstance(datos_settings, list) else datos_settings
         turno_id = usuario["datos_temporales"].get("turno_id")
         datos_cliente = mensaje 
         
@@ -188,35 +225,31 @@ async def handle_whatsapp_message(payload: WebhookPayload):
         
         if exito:
             actualizar_estado_usuario(telefono_cliente, "ESPERANDO_PAGO")
-            datos_settings = config_complejo.get("settings", {})
-            settings = datos_settings[0] if isinstance(datos_settings, list) else datos_settings
-            precio = settings.get("price_per_hour", 25000)
-            alias = settings.get("payment_alias", "NO_CONFIGURADO")
             
-            respuesta = f"¡Perfecto! Ya bloqueé la cancha a tu nombre. ⏳\n\nPor favor, transferí ${precio} al alias *{alias}* y enviame la *FOTO del comprobante* por acá.\n\nTenés 15 minutos exactos."
+            # Leemos los datos configurados en el panel web
+            settings = config_complejo.get("settings", {})
+            alias = settings.get("alias_pago", "NO_CONFIGURADO")
+            tolerancia = settings.get("minutos_tolerancia_pago", 15)
+            tipo_cobro = "el total de la cancha" if settings.get("tipo_cobro", "TOTAL") == "TOTAL" else "la seña correspondiente"
+            
+            respuesta = f"¡Perfecto! Ya bloqueé la cancha a tu nombre. ⏳\n\nPor favor, transferí {tipo_cobro} al alias *{alias}* y enviame la *FOTO del comprobante* por acá.\n\nTenés {tolerancia} minutos exactos antes de que el sistema libere el turno automáticamente."
             return {"reply": respuesta}
         else:
             limpiar_usuario(telefono_cliente)
-            return {"reply": "Uy, disculpá. Alguien más reservó ese horario. 😔 Escribime 'Hola' para buscar otra opción."}
+            return {"reply": "Uy, disculpá. Alguien más reservó ese horario recién. 😔 Escribime 'Hola' para buscar otra opción."}
 
     elif estado_actual == "ESPERANDO_PAGO":
         if payload.has_media:
             turno_id = usuario["datos_temporales"].get("turno_id")
             actualizar_estado_usuario(telefono_cliente, "EN_REVISION")
             
-            # Buscamos los números de los dueños para alertarlos
-            datos_settings = config_complejo.get("settings", {})
-            settings = datos_settings[0] if isinstance(datos_settings, list) else datos_settings
+            settings = config_complejo.get("settings", {})
+            numeros_alerta = settings.get("numeros_alerta", [])
             
-            # 1. Extraemos la lista del JSONB
-            numeros_alerta = settings.get("notification_numbers", [])
-            
-            # 2. Fallback: si la lista está vacía, usamos el número viejo o uno por defecto
+            # Si el dueño aún no configuró números, mandamos al tuyo por defecto
             if not numeros_alerta:
-                numero_viejo = settings.get("notification_number", "5492975949503")
-                numeros_alerta = [numero_viejo]
+                numeros_alerta = ["5492975949503"]
                 
-            # 3. Escudo de Formato Automático
             numeros_formateados = []
             for num in numeros_alerta:
                 num_str = str(num).strip()

@@ -13,17 +13,22 @@ KEY = os.getenv("SUPABASE_KEY")
 supabase: Client = create_client(URL, KEY)
 
 def obtener_configuracion_complejo(bot_phone_number: str) -> dict:
-    print(f"\n🕵️‍♂️ DEBUG: Buscando complejo con número exacto: '{bot_phone_number}'")
+    print(f"\n🕵️‍♂️ DEBUG: Buscando complejo con el número: '{bot_phone_number}'")
     try:
-        response = supabase.table('complexes').select('*, settings(*)').eq('whatsapp_number', bot_phone_number).execute()
+        # 1. Buscamos el negocio en la nueva tabla 'complejos'
+        res = supabase.table('complejos').select('*').eq('numero_whatsapp', bot_phone_number).execute()
         
-        print(f"📦 DEBUG: Respuesta cruda de Supabase: {response}")
-        
-        if response.data:
-            print("✅ DEBUG: ¡Complejo encontrado!")
-            return response.data[0]
+        if res.data:
+            complejo = res.data[0]
+            
+            # 2. Le inyectamos su inventario de canchas activas
+            canchas_res = supabase.table('canchas').select('*').eq('complejo_id', complejo['id']).eq('activa', True).execute()
+            complejo['canchas_inventario'] = canchas_res.data if canchas_res.data else []
+            
+            print(f"✅ DEBUG: ¡Complejo '{complejo['nombre_negocio']}' encontrado!")
+            return complejo
         else:
-            print("⚠️ DEBUG: Supabase respondió con éxito, pero la lista está vacía (Data=[]).")
+            print("⚠️ DEBUG: No se encontró ningún negocio con ese número de WhatsApp.")
             return None
             
     except Exception as e:
@@ -115,7 +120,8 @@ def confirmar_turno(turno_id: int) -> bool:
 def obtener_datos_turno(turno_id: int) -> dict:
     """Busca los datos de un turno para saber a quién notificarle la aprobación."""
     try:
-        res = supabase.table('turnos').select('cancha_nombre, cliente_nombre, telefono_cliente').eq('id', turno_id).execute()
+        # ⚠️ MODIFICACIÓN: Agregamos 'fecha_hora' a la consulta SQL
+        res = supabase.table('turnos').select('cancha_nombre, cliente_nombre, telefono_cliente, fecha_hora').eq('id', turno_id).execute()
         if res.data:
             return res.data[0]
         return None

@@ -13,22 +13,27 @@ API_KEY = os.getenv("GEMINI_API_KEY")
 client = genai.Client(api_key=API_KEY)
 
 def generar_prompt_maestro(config: dict, texto_turnos: str) -> str:
-    # Extraemos los datos del complejo
-    nombre_complejo = config.get("name", "Complejo Deportivo")
+    # Extraemos los datos del nuevo esquema SaaS
+    nombre_complejo = config.get("nombre_negocio", "Complejo Deportivo")
     
-    settings = config.get("settings", [])
-    if isinstance(settings, list) and len(settings) > 0:
-        settings = settings[0]
+    settings = config.get("settings", {})
+    
+    alias = settings.get("alias_pago", "NO CONFIGURADO")
+    cbu = settings.get("cbu_pago", "NO CONFIGURADO")
+    titular = settings.get("titular_pago", "TITULAR")
+    tipo_cobro = settings.get("tipo_cobro", "TOTAL")
+    ubicacion = settings.get("ubicacion", "Dirección no especificada, pedile al cliente que aguarde un momento para consultarlo.") # <-- NUEVA LÍNEA
+    
+    # Armamos el inventario dinámico de canchas y precios
+    canchas = config.get("canchas_inventario", [])
+    texto_canchas = ""
+    if canchas:
+        for c in canchas:
+            texto_canchas += f"- {c['nombre']} ({c['tipo']}): ${c['precio']} por hora.\n"
     else:
-        settings = {}
-
-    precio = settings.get("price_per_hour", 25000)
-    alias = settings.get("payment_alias", "ALIAS.NO.CONFIGURADO")
-    cbu = settings.get("payment_cbu", "CBU.NO.CONFIGURADO")
-    titular = settings.get("payment_holder", "TITULAR")
-    
+        texto_canchas = "- (Aún no hay canchas configuradas)"
+        
     # --- INICIO DEL ANCLA TEMPORAL ---
-    # Calculamos la fecha y hora actual de Argentina para dársela a la IA
     zona_argentina = timezone(timedelta(hours=-3))
     ahora = datetime.now(zona_argentina)
     dias = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"]
@@ -43,13 +48,15 @@ Eres el recepcionista virtual del complejo deportivo "{nombre_complejo}".
 
 [CONTEXTO TEMPORAL - RELOJ DEL SISTEMA]
 Hoy es {dia_semana}, {fecha_hoy} y la hora actual es {hora_hoy}. 
-USA ESTA FECHA para calcular matemáticamente a qué día se refiere el cliente cuando dice "hoy", "mañana", "pasado mañana" o cuando menciona un día de la semana.
+USA ESTA FECHA para calcular a qué día se refiere el cliente.
 
 [PERSONALIDAD Y TONO]
 Rápido, profesional y cordial. Usá trato informal argentino ("vos"), pero TIENES ESTRICTAMENTE PROHIBIDO usar jergas como "che", "capo", "picadito" o "juntada".
 
-[DATOS FIJOS DEL COMPLEJO]
-- Precio por hora: ${precio}.
+[NUESTRAS CANCHAS, PRECIOS Y UBICACIÓN]
+{texto_canchas}
+- Ubicación / Dirección: {ubicacion}
+- Política: El complejo cobra de forma "{tipo_cobro}" (Seña o Total).
 - Datos de Pago -> Alias: {alias} | CBU: {cbu} | Titular: {titular}
 
 [INVENTARIO DE TURNOS REALES]
@@ -58,9 +65,9 @@ A continuación, se listan los ÚNICOS turnos disponibles en la base de datos. N
 
 [FLUJO DE VENTA DIRECTO]
 Guía la conversación ESTRICTAMENTE en este orden:
-1. Ofrece los horarios que encajen con lo que el cliente pide leyendo tu INVENTARIO. NUNCA le muestres la palabra "ID" ni el número de ID al cliente en tu mensaje de texto, usalo solo de manera interna.
-2. Cuando el cliente elija un horario, agradécele, pídele su Nombre Completo y DNI, y AÑADE ESTRICTAMENTE al final de tu respuesta esta etiqueta oculta: [RESERVAR_ID: X] (reemplazando la X por el ID exacto del turno que el cliente eligió).
-3. NO hables de pagos, transferencias ni reservas confirmadas. Tu único trabajo termina al pedir el nombre y escupir la etiqueta.
+1. Ofrece los horarios que encajen leyendo tu INVENTARIO, mencionando de qué cancha se trata y su precio correspondiente. NUNCA muestres la palabra "ID" ni el número de ID al cliente.
+2. Cuando el cliente elija un horario, agradécele, pídele su Nombre Completo, y AÑADE ESTRICTAMENTE al final de tu respuesta esta etiqueta oculta: [RESERVAR_ID: X] (reemplazando la X por el ID exacto del turno que eligió).
+3. NO hables de pagos, transferencias ni alias. Tu único trabajo termina al pedir el nombre y escupir la etiqueta.
 """
     return prompt
 
