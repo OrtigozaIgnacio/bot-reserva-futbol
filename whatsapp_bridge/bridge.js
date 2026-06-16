@@ -45,10 +45,21 @@ const startBot = (complejoId) => {
         statuses[complejoId] = 'QR_LISTO';
     });
 
-    client.on('ready', () => {
-        console.log(`✅ [BOT ${complejoId}] ¡Conectado y Listo!`);
+    client.on('ready', async () => {
+        const botNumber = client.info.wid.user; // Extrae el número del WhatsApp escaneado
+        console.log(`✅ [BOT ${complejoId}] ¡Conectado y Listo! Número detectado: ${botNumber}`);
         qrCodes[complejoId] = null;
         statuses[complejoId] = 'CONECTADO';
+
+        // 💾 AUTO-VINCULACIÓN: Registra el número en Supabase de forma transparente
+        try {
+            await axios.put(`http://127.0.0.1:8000/api/complejos/${complejoId}/vincular_whatsapp`, {
+                numero_whatsapp: botNumber
+            });
+            console.log(`💾 [BOT ${complejoId}] Número ${botNumber} guardado automáticamente en Supabase.`);
+        } catch (error) {
+            console.log(`⚠️ [BOT ${complejoId}] No se pudo registrar el número en el backend:`, error.message);
+        }
     });
 
     // Función de Auto-Sanación

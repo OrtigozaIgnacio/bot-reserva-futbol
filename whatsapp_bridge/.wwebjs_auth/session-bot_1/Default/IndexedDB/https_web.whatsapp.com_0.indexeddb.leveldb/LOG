@@ -1,3 +1,12 @@
-2026/06/15-15:01:21.556 4184 Reusing MANIFEST E:\Datos\Nacho\Proyectos\bot-reserva-futbol\whatsapp_bridge\.wwebjs_auth\session-bot_1\Default\IndexedDB\https_web.whatsapp.com_0.indexeddb.leveldb/MANIFEST-000001
-2026/06/15-15:01:21.556 4184 Recovering log #11
-2026/06/15-15:01:21.559 4184 Reusing old log E:\Datos\Nacho\Proyectos\bot-reserva-futbol\whatsapp_bridge\.wwebjs_auth\session-bot_1\Default\IndexedDB\https_web.whatsapp.com_0.indexeddb.leveldb/000011.log 
+2026/06/16-11:59:16.632 2fd4 Reusing MANIFEST E:\Datos\Nacho\Proyectos\bot-reserva-futbol\whatsapp_bridge\.wwebjs_auth\session-bot_1\Default\IndexedDB\https_web.whatsapp.com_0.indexeddb.leveldb/MANIFEST-000001
+2026/06/16-11:59:16.632 2fd4 Recovering log #15
+2026/06/16-11:59:16.689 2fd4 Reusing old log E:\Datos\Nacho\Proyectos\bot-reserva-futbol\whatsapp_bridge\.wwebjs_auth\session-bot_1\Default\IndexedDB\https_web.whatsapp.com_0.indexeddb.leveldb/000015.log 
+2026/06/16-11:59:19.632 4214 Level-0 table #20: started
+2026/06/16-11:59:19.934 4214 Level-0 table #20: 1186650 bytes OK
+2026/06/16-11:59:19.992 4214 Delete type=0 #15
+2026/06/16-11:59:20.140 1064 Compacting 1@1 + 1@2 files
+2026/06/16-11:59:20.642 1064 Generated table #21@1: 42300 keys, 1872093 bytes
+2026/06/16-11:59:20.683 1064 Compacted 1@1 + 1@2 files => 1872093 bytes
+2026/06/16-11:59:20.775 1064 compacted to: files[ 0 0 1 0 0 0 0 ]
+2026/06/16-11:59:20.775 1064 Delete type=2 #17
+2026/06/16-11:59:20.775 1064 Delete type=2 #20

@@ -45,6 +45,7 @@
             <ul>
                 <li class="active" onclick="cambiarVista('dashboard', this)">🏠 Inicio</li>
                 <li onclick="cambiarVista('canchas', this)">🏟️ Mis Canchas</li>
+                <li onclick="cambiarVista('agenda', this)">📅 Mi Agenda</li>
                 <li onclick="cambiarVista('reglas', this)">⏱️ Horarios y Reglas</li>
                 <li onclick="cambiarVista('pagos', this)">💰 Datos de Pago</li>
                 <li onclick="cambiarVista('whatsapp', this)">📱 Conexión Bot</li>
@@ -80,6 +81,41 @@
                     <tbody id="tabla-canchas">
                         </tbody>
                 </table>
+            </div>
+        </div>
+
+        <div id="vista-agenda" class="vista">
+            <div class="config-box" style="max-width: 900px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #334155; padding-bottom: 10px; margin-bottom: 20px;">
+                    <h3 style="margin: 0; border: none; padding: 0;">Gestión de Turnos</h3>
+                    <button class="btn-primary" id="btn-generar-agenda" onclick="generarAgenda()">Aprovisionar Semana ⚡</button>
+                </div>
+                
+                <p style="color: var(--text-muted); font-size: 14px; margin-bottom: 20px;">
+                    Navegá por los días para ver la disponibilidad. Los turnos bloqueados no serán ofrecidos por el bot.
+                </p>
+
+                <div id="mensaje-agenda" style="margin-bottom: 15px; font-weight: bold; font-size: 14px;"></div>
+
+                <div id="navegador-dias" style="display: flex; gap: 10px; overflow-x: auto; padding-bottom: 10px; margin-bottom: 20px;">
+                    </div>
+
+                <div style="background: var(--bg-dark); padding: 15px; border-radius: 8px; border: 1px solid #334155;">
+                    <h4 id="titulo-dia-seleccionado" style="margin-top: 0; color: white;">Cargando turnos...</h4>
+                    <table style="width: 100%; border-collapse: collapse; text-align: left;">
+                        <thead>
+                            <tr style="border-bottom: 1px solid #334155; color: var(--text-muted); font-size: 13px; text-transform: uppercase;">
+                                <th style="padding: 10px;">Cancha</th>
+                                <th style="padding: 10px;">Horario</th>
+                                <th style="padding: 10px;">Estado IA</th>
+                                <th style="padding: 10px;">Cliente</th>
+                                <th style="padding: 10px;">Acción Manual</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tabla-agenda">
+                            </tbody>
+                    </table>
+                </div>
             </div>
         </div>
 
@@ -222,14 +258,16 @@
 
         // 2. NAVEGACIÓN LATERAL
         function cambiarVista(idVista, elementoMenu) {
-            // Ocultamos todas las vistas
             document.querySelectorAll('.vista').forEach(el => el.classList.remove('activa'));
-            // Quitamos la clase 'active' de todos los botones del menú
             document.querySelectorAll('nav li').forEach(el => el.classList.remove('active'));
             
-            // Mostramos la vista seleccionada y remarcamos el botón
             document.getElementById(`vista-${idVista}`).classList.add('activa');
             elementoMenu.classList.add('active');
+
+            // NUEVO: Si entramos a la agenda, cargamos los turnos
+            if (idVista === 'agenda') {
+                cargarTurnosSemana();
+            }
         }
 
         // Carga las configuraciones al entrar a la página
@@ -425,6 +463,201 @@
                 alert("⚠️ Error de conexión.");
             }
         }
+        // --- MÓDULO AGENDA DE TURNOS ---
+        let turnosSemana = []; // Guardamos los turnos en memoria
+        let fechaActivaStr = ''; // Guardará la fecha YYYY-MM-DD seleccionada
+
+        async function generarAgenda() {
+            const idComplejo = localStorage.getItem('complejo_id');
+            const btn = document.getElementById('btn-generar-agenda');
+            const msjBox = document.getElementById('mensaje-agenda');
+            
+            btn.innerText = "Generando..."; btn.disabled = true; msjBox.innerText = "";
+
+            try {
+                const res = await fetch(`http://127.0.0.1:8000/api/complejos/${idComplejo}/generar_agenda`, { method: 'POST' });
+                const data = await res.json();
+                
+                if (data.error) {
+                    msjBox.style.color = "#ef4444"; msjBox.innerText = "❌ " + data.error;
+                } else {
+                    msjBox.style.color = "#10b981"; msjBox.innerText = data.mensaje;
+                    cargarTurnosSemana(); // Recargamos
+                }
+            } catch (e) {
+                msjBox.style.color = "#ef4444"; msjBox.innerText = "⚠️ Error de conexión con el servidor.";
+            } finally {
+                btn.innerText = "Aprovisionar Semana ⚡"; btn.disabled = false;
+            }
+        }
+
+        // Función para renderizar los botones de los 7 días
+        function renderizarNavegadorDias() {
+            const nav = document.getElementById('navegador-dias');
+            nav.innerHTML = '';
+            
+            const hoy = new Date();
+            const diasSemana = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
+
+            for (let i = 0; i < 7; i++) {
+                let fecha = new Date(hoy);
+                fecha.setDate(hoy.getDate() + i);
+                
+                // Formateamos como YYYY-MM-DD para comparar fácil
+                const fechaStr = fecha.toISOString().split('T')[0];
+                
+                // Si es la primera vez, marcamos hoy como activo
+                if (i === 0 && !fechaActivaStr) fechaActivaStr = fechaStr;
+
+                let etiqueta = diasSemana[fecha.getDay()] + ' ' + fecha.getDate();
+                if (i === 0) etiqueta = 'Hoy';
+                if (i === 1) etiqueta = 'Mañana';
+
+                const btn = document.createElement('button');
+                btn.innerText = etiqueta;
+                btn.style.padding = "8px 16px";
+                btn.style.borderRadius = "20px";
+                btn.style.border = "1px solid #334155";
+                btn.style.cursor = "pointer";
+                btn.style.fontWeight = "bold";
+                btn.style.whiteSpace = "nowrap";
+
+                // Estilo para el botón activo
+                if (fechaStr === fechaActivaStr) {
+                    btn.style.background = "var(--accent)";
+                    btn.style.color = "white";
+                    btn.style.borderColor = "var(--accent)";
+                } else {
+                    btn.style.background = "transparent";
+                    btn.style.color = "var(--text-muted)";
+                }
+
+                btn.onclick = () => {
+                    fechaActivaStr = fechaStr;
+                    renderizarNavegadorDias(); // Re-dibujamos para mover el color activo
+                    filtrarTablaPorDia(); // Cambiamos los turnos de abajo
+                };
+                nav.appendChild(btn);
+            }
+        }
+
+        async function cargarTurnosSemana() {
+            const idComplejo = localStorage.getItem('complejo_id');
+            const tbody = document.getElementById('tabla-agenda');
+            tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 20px;">Cargando agenda...</td></tr>';
+            
+            renderizarNavegadorDias(); // Armamos la botonera superior
+
+            try {
+                // Hacemos el fetch a la API (Próximamente actualizaremos Python para que traiga 7 días en vez de 2)
+                const res = await fetch(`http://127.0.0.1:8000/api/complejos/${idComplejo}/turnos_hoy`);
+                const data = await res.json();
+                
+                if (data.turnos) {
+                    turnosSemana = data.turnos;
+                    filtrarTablaPorDia();
+                }
+            } catch (e) {
+                tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 20px; color: #ef4444;">Error de conexión.</td></tr>';
+            }
+        }
+
+        // Filtra los turnos que están en memoria según el día seleccionado
+        function filtrarTablaPorDia() {
+            const tbody = document.getElementById('tabla-agenda');
+            const titulo = document.getElementById('titulo-dia-seleccionado');
+            tbody.innerHTML = '';
+
+            // Formatear el título
+            const partesFecha = fechaActivaStr.split('-');
+            titulo.innerText = `Turnos del ${partesFecha[2]}/${partesFecha[1]}`;
+
+            // Filtramos la memoria
+            const turnosDelDia = turnosSemana.filter(t => {
+                // Convertimos la hora UTC de Supabase a Local para saber en qué día cae realmente
+                const fechaLocal = new Date(t.fecha_hora);
+                const tStr = fechaLocal.toLocaleDateString('en-CA'); // Formato YYYY-MM-DD
+                return tStr === fechaActivaStr;
+            });
+
+            if (turnosDelDia.length > 0) {
+                turnosDelDia.forEach(t => {
+                    let colorEstado = '#94a3b8'; // GRIS (Bloqueado/Inactivo)
+                    let etiquetaEstado = t.estado.toUpperCase();
+                    let btnHtml = '';
+
+                    const fechaLocal = new Date(t.fecha_hora);
+                    const horaMuestra = fechaLocal.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+
+                    // Lógica visual de los estados de la IA
+                    if (t.estado === 'disponible') {
+                        colorEstado = '#10b981'; // VERDE
+                        btnHtml = `<button onclick="toggleEstadoTurno(${t.id}, 'disponible')" style="background: transparent; border: 1px solid #ef4444; color: #ef4444; cursor: pointer; padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight:bold;">Cerrar Cancha</button>`;
+                    } 
+                    else if (t.estado === 'bloqueado') {
+                        colorEstado = '#64748b'; // GRIS
+                        etiquetaEstado = 'BLOQUEADO';
+                        btnHtml = `<button onclick="toggleEstadoTurno(${t.id}, 'bloqueado')" style="background: transparent; border: 1px solid #10b981; color: #10b981; cursor: pointer; padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight:bold;">Abrir Turno</button>`;
+                    }
+                    else if (t.estado === 'pre-reservado') {
+                        colorEstado = '#f59e0b'; // NARANJA
+                        etiquetaEstado = '⏳ ESPERANDO PAGO';
+                        btnHtml = `<button onclick="toggleEstadoTurno(${t.id}, 'pre-reservado')" style="background: transparent; border: 1px solid #94a3b8; color: #94a3b8; cursor: pointer; padding: 4px 8px; border-radius: 4px; font-size: 12px;" title="Cancela la espera y libera la cancha">Forzar Liberación</button>`;
+                    }
+                    else if (t.estado === 'reservado') {
+                        colorEstado = '#3b82f6'; // AZUL
+                        etiquetaEstado = '✅ PAGADO';
+                        btnHtml = `<button onclick="toggleEstadoTurno(${t.id}, 'reservado')" style="background: transparent; border: 1px solid #ef4444; color: #ef4444; cursor: pointer; padding: 4px 8px; border-radius: 4px; font-size: 12px;">Cancelar Reserva</button>`;
+                    }
+
+                    tbody.insertAdjacentHTML('beforeend', `
+                        <tr style="border-bottom: 1px solid #334155; transition: 0.2s;">
+                            <td style="padding: 12px 10px;"><strong>${t.cancha_nombre}</strong></td>
+                            <td style="padding: 12px 10px; font-size: 15px; font-weight:bold;">${horaMuestra}</td>
+                            <td style="padding: 12px 10px; color: ${colorEstado}; font-weight: bold; font-size: 12px;">${etiquetaEstado}</td>
+                            <td style="padding: 12px 10px; color: var(--text-main); font-size: 14px;">${t.cliente_nombre || '<span style="color:var(--text-muted)">-</span>'}</td>
+                            <td style="padding: 12px 10px;">${btnHtml}</td>
+                        </tr>
+                    `);
+                });
+            } else {
+                tbody.innerHTML = `<tr><td colspan="5" style="text-align: center; padding: 30px; color: var(--text-muted);">No hay turnos creados para el ${partesFecha[2]}/${partesFecha[1]}.<br>Presioná Aprovisionar Semana.</td></tr>`;
+            }
+        }
+
+        async function toggleEstadoTurno(idTurno, estadoActual) {
+            let nuevoEstado = '';
+            let mensajeConfirmacion = '';
+
+            // Lógica de transición de estados forzados por el dueño
+            if (estadoActual === 'disponible') {
+                mensajeConfirmacion = '¿Querés cerrar este horario? El bot no lo ofrecerá.';
+                nuevoEstado = 'bloqueado';
+            } else if (estadoActual === 'bloqueado') {
+                mensajeConfirmacion = '¿Reabrir este turno para que el bot pueda venderlo?';
+                nuevoEstado = 'disponible';
+            } else if (estadoActual === 'pre-reservado' || estadoActual === 'reservado') {
+                mensajeConfirmacion = '⚠️ ¿Estás seguro de cancelar esta reserva/espera de pago? El turno volverá a estar disponible.';
+                nuevoEstado = 'disponible';
+            }
+
+            if (!confirm(mensajeConfirmacion)) return;
+
+            try {
+                const res = await fetch(`http://127.0.0.1:8000/api/turnos/${idTurno}/estado`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ estado: nuevoEstado })
+                });
+                const data = await res.json();
+                
+                if (data.error) alert(data.error);
+                else cargarTurnosSemana(); // Recarga y re-aplica los filtros
+            } catch (e) {
+                alert("⚠️ Error de conexión.");
+            }
+        }
+
         // --- MÓDULO WHATSAPP (PUENTE NODE.JS) ---
         let intervaloQr = null;
 

@@ -59,7 +59,7 @@ class NuevoCliente(BaseModel):
     token_maestro: str
 
 # Tu llave secreta (Cambiá esto por una contraseña difícil que solo vos sepas)
-TOKEN_SUPERADMIN = "Nacho_SaaS_2026_Admin" 
+TOKEN_SUPERADMIN = "surya2016" 
 
 class LoginCliente(BaseModel):
     email: str
@@ -273,7 +273,24 @@ Hola {nombre_jugador}, tu pago ha sido aprobado exitosamente. Acá tenés tu tic
             return {"reply": "Por favor, enviame la *foto del comprobante* para confirmar el turno. (O escribí 'cancelar')."}
 
     elif estado_actual == "EN_REVISION":
-        return {"reply": "Tu comprobante sigue en revisión. ⏳ Por favor, aguardá unos minutos más."}
+        mensaje_limpio = mensaje.strip().upper()
+        
+        # 1. La Válvula de Escape
+        if mensaje_limpio == "CANCELAR":
+            # Rescatamos el ID del turno de la memoria temporal
+            turno_id = usuario.get("datos_temporales", {}).get("turno_id")
+            
+            if turno_id:
+                # Liberamos la cancha en la base de datos
+                cambiar_estado_turno_manual(turno_id, "disponible")
+                
+            limpiar_usuario(telefono_cliente) # Reseteamos la memoria del bot
+            
+            return {"reply": "✅ Cancelamos tu reserva anterior y liberamos la cancha.\n\nEscribime qué estás buscando ahora (Ej: '¿Qué turnos hay para hoy a las 14?')."}
+            
+        # 2. El Mensaje Instructivo
+        else:
+            return {"reply": "⏳ Tu comprobante sigue en revisión por administración.\n\n⚠️ *Si querés buscar otro horario o te equivocaste, escribí la palabra CANCELAR para anular tu solicitud actual.*"}
 
 @app.get("/api/complejos/{complejo_id}/settings")
 async def get_settings(complejo_id: int):
@@ -289,11 +306,55 @@ async def update_settings(complejo_id: int, datos: dict):
         return {"mensaje": "✅ Configuraciones guardadas exitosamente."}
     return {"error": "Error al guardar en la base de datos."}
 
+@app.put("/api/complejos/{complejo_id}/vincular_whatsapp")
+async def vincular_whatsapp_complejo(complejo_id: int, datos: dict):
+    """Guarda automáticamente en Supabase el número de WhatsApp que el cliente acaba de escanear."""
+    numero = datos.get("numero_whatsapp")
+    if not numero:
+        return {"error": "Falta el número de WhatsApp en la solicitud."}
+        
+    try:
+        # Aprovechamos el objeto 'supabase' importado globalmente
+        supabase.table('complejos').update({"numero_whatsapp": numero}).eq('id', complejo_id).execute()
+        print(f"💾 [BACKEND] Complejo ID {complejo_id} vinculado con éxito al WhatsApp: {numero}")
+        return {"mensaje": "✅ Número de WhatsApp vinculado correctamente en la base de datos."}
+    except Exception as e:
+        print(f"❌ [BACKEND] Error vinculando WhatsApp: {e}")
+        return {"error": f"No se pudo actualizar la base de datos: {str(e)}"}
+
 @app.get("/api/complejos/{complejo_id}/canchas")
 async def listar_canchas(complejo_id: int):
     """Devuelve la lista de canchas al panel web del dueño."""
     canchas = obtener_canchas_complejo(complejo_id)
     return {"canchas": canchas}
+
+@app.post("/api/complejos/{complejo_id}/generar_agenda")
+async def generar_agenda_api(complejo_id: int):
+    """Endpoint para que el dueño genere su bloque de turnos semanales."""
+    # Por defecto genera turnos para los próximos 7 días
+    resultado = generar_agenda_complejo(complejo_id, dias_a_generar=7)
+    
+    if "error" in resultado:
+        return {"error": resultado["error"]}
+    return {"mensaje": resultado["mensaje"]}
+
+# Definimos el modelo para recibir el nuevo estado
+class ActualizarEstadoTurno(BaseModel):
+    estado: str
+
+@app.get("/api/complejos/{complejo_id}/turnos_hoy")
+async def get_turnos_hoy_api(complejo_id: int):
+    """Devuelve los turnos de las próximas 48hs al panel del cliente."""
+    turnos = obtener_turnos_hoy(complejo_id)
+    return {"turnos": turnos}
+
+@app.put("/api/turnos/{turno_id}/estado")
+async def cambiar_estado_api(turno_id: int, datos: ActualizarEstadoTurno):
+    """Recibe la orden del panel para bloquear o liberar un turno."""
+    exito = cambiar_estado_turno_manual(turno_id, datos.estado)
+    if exito:
+        return {"mensaje": "✅ Estado actualizado correctamente."}
+    return {"error": "Error al intentar actualizar el turno."}
 
 @app.post("/api/complejos/{complejo_id}/canchas")
 async def agregar_cancha(complejo_id: int, datos: NuevaCancha):

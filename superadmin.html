@@ -3,196 +3,262 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SaaS Control Center - Superadmin</title>
+    <title>Centro de Mandos - SaaS Superadmin</title>
     <style>
         :root {
             --bg-dark: #0f172a;
             --panel-bg: #1e293b;
-            --accent: #3b82f6;
+            --accent: #6366f1; /* Índigo para diferenciarlo del verde del cliente */
+            --accent-hover: #4f46e5;
             --text-main: #f8fafc;
             --text-muted: #94a3b8;
+            --danger: #ef4444;
+            --success: #10b981;
         }
+        
         body { margin: 0; font-family: system-ui, sans-serif; background: var(--bg-dark); color: var(--text-main); display: flex; height: 100vh; }
         
         /* Sidebar lateral */
-        aside { width: 260px; background: var(--panel-bg); padding: 20px; border-right: 1px solid #334155; }
-        .brand { font-size: 24px; font-weight: bold; margin-bottom: 40px; color: white; }
-        .brand span { color: var(--accent); }
-        nav ul { list-style: none; padding: 0; }
-        nav li { padding: 12px 15px; margin-bottom: 8px; border-radius: 8px; cursor: pointer; color: var(--text-muted); transition: 0.2s; }
-        nav li:hover, nav li.active { background: #334155; color: white; }
+        aside { width: 260px; background: var(--panel-bg); padding: 20px; border-right: 1px solid #334155; display: flex; flex-direction: column; }
+        .brand { font-size: 20px; font-weight: bold; margin-bottom: 40px; color: white; line-height: 1.2; border-bottom: 1px solid #334155; padding-bottom: 15px;}
+        .brand span { color: var(--accent); font-size: 14px; display: block; margin-top: 5px;}
         
-        /* Contenido principal */
+        nav ul { list-style: none; padding: 0; margin: 0; }
+        nav li { padding: 12px 15px; margin-bottom: 10px; cursor: pointer; border-radius: 6px; transition: 0.2s; color: var(--text-muted); font-weight: 500;}
+        nav li:hover { background: #334155; color: white; }
+        nav li.active { background: var(--accent); color: white; }
+        
+        /* Contenido Principal */
         main { flex: 1; padding: 40px; overflow-y: auto; }
-        .header-flex { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; }
+        .header-main { margin-bottom: 30px; }
+        .header-main h1 { margin: 0 0 10px 0; font-size: 28px; }
+        .header-main p { margin: 0; color: var(--text-muted); }
         
-        /* Botones y Tablas */
-        .btn-primary { background: var(--accent); color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-weight: bold; }
-        .btn-primary:hover { background: #2563eb; }
+        /* Tarjetas / Paneles */
+        .card { background: var(--panel-bg); padding: 25px; border-radius: 10px; border: 1px solid #334155; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); margin-bottom: 25px;}
         
-        table { width: 100%; border-collapse: collapse; background: var(--panel-bg); border-radius: 8px; overflow: hidden; }
+        /* Formularios */
+        .form-group { margin-bottom: 20px; }
+        label { display: block; margin-bottom: 8px; font-size: 14px; color: var(--text-muted); font-weight: 500;}
+        input { width: 100%; padding: 12px; background: var(--bg-dark); border: 1px solid #334155; color: white; border-radius: 6px; box-sizing: border-box; font-family: inherit;}
+        input:focus { outline: none; border-color: var(--accent); }
+        
+        .btn-primary { background: var(--accent); color: white; border: none; padding: 12px 20px; border-radius: 6px; cursor: pointer; font-weight: bold; width: 100%; transition: 0.2s; font-size: 15px;}
+        .btn-primary:hover { background: var(--accent-hover); }
+        
+        /* Tabla de Clientes */
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
         th, td { padding: 15px; text-align: left; border-bottom: 1px solid #334155; }
-        th { background: #0f172a; color: var(--text-muted); font-size: 13px; text-transform: uppercase; }
+        th { color: var(--text-muted); font-size: 14px; text-transform: uppercase; letter-spacing: 0.5px;}
+        tr:hover { background: rgba(255, 255, 255, 0.02); }
         
-        /* Status Badges */
-        .status-badge { padding: 4px 8px; border-radius: 12px; font-size: 12px; font-weight: bold; }
-        .status-online { background: rgba(34, 197, 94, 0.2); color: #4ade80; }
-        .status-offline { background: rgba(239, 68, 68, 0.2); color: #f87171; }
-
-        /* Estilos del Modal */
-        .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); justify-content: center; align-items: center; z-index: 1000; }
-        .modal-content { background: var(--panel-bg); padding: 30px; border-radius: 8px; width: 400px; border: 1px solid #334155; }
-        .form-group { margin-bottom: 15px; }
-        .form-group label { display: block; margin-bottom: 5px; color: var(--text-muted); font-size: 14px; }
-        .form-group input { width: 100%; padding: 10px; background: var(--bg-dark); border: 1px solid #334155; color: white; border-radius: 5px; box-sizing: border-box; }
-        .btn-secondary { background: transparent; color: var(--text-muted); border: 1px solid #334155; padding: 10px 20px; border-radius: 6px; cursor: pointer; }
-        .btn-secondary:hover { background: #334155; color: white; }
+        .badge { padding: 5px 10px; border-radius: 20px; font-size: 12px; font-weight: bold; }
+        .badge.online { background: rgba(16, 185, 129, 0.2); color: var(--success); }
+        .badge.offline { background: rgba(239, 68, 68, 0.2); color: var(--danger); }
+        
+        /* Ocultar vistas */
+        .hidden { display: none !important; }
     </style>
 </head>
 <body>
 
     <aside>
-        <div class="brand">SaaS<span>Futbol</span></div>
+        <div class="brand">
+            SaaS Control Panel
+            <span>👨‍💻 Superadmin Mode</span>
+        </div>
         <nav>
             <ul>
-                <li class="active">🏢 Negocios Activos</li>
-                <li>📊 Métricas Globales</li>
-                <li>⚙️ Ajustes de Sistema</li>
+                <li id="tab-dashboard" class="active" onclick="cambiarVista('dashboard')">📊 Panel General</li>
+                <li id="tab-nuevo" onclick="cambiarVista('nuevo')">➕ Alta de Cliente</li>
             </ul>
         </nav>
     </aside>
 
     <main>
-        <div class="header-flex">
-            <div>
-                <h1 style="margin: 0;">Gestión de Clientes</h1>
-                <p style="color: var(--text-muted); margin-top: 5px;">Administra los complejos deportivos y sus instancias de WhatsApp.</p>
+        
+        <div id="vista-dashboard">
+            <div class="header-main">
+                <h1>Panel General</h1>
+                <p>Monitoreo de complejos deportivos registrados y estado de los bots.</p>
             </div>
-            <button class="btn-primary" onclick="abrirModalNuevoCliente()">+ Registrar Negocio</button>
+            
+            <div class="card">
+                <h2>Directorio de Clientes</h2>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Negocio</th>
+                            <th>Email de Acceso</th>
+                            <th>Estado Bot</th>
+                            <th>Acción</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tabla-clientes-body">
+                        <tr>
+                            <td>1</td>
+                            <td><strong>La Canchita Test</strong></td>
+                            <td>dueño@lacanchita.com</td>
+                            <td><span class="badge online">Conectado</span></td>
+                            <td><button style="background:transparent; border:1px solid var(--text-muted); color:white; padding:5px 10px; border-radius:4px; cursor:pointer;">Ver Info</button></td>
+                        </tr>
+                        </tbody>
+                </table>
+            </div>
         </div>
 
-        <table>
-            <thead>
-                <tr>
-                    <th>ID</th>
-                    <th>Nombre del Complejo</th>
-                    <th>Email (Login)</th>
-                    <th>Estado WhatsApp</th>
-                    <th>Acciones</th>
-                </tr>
-            </thead>
-            <tbody id="tabla-clientes">
-                </tbody>
-        </table>
+        <div id="vista-nuevo" class="hidden">
+            <div class="header-main">
+                <h1>Alta de Nuevo Cliente</h1>
+                <p>Registrá un nuevo complejo para darle acceso a su propio panel.</p>
+            </div>
+            
+            <div class="card" style="max-width: 500px;">
+                <form id="form-nuevo-cliente" onsubmit="prepararEnvioCliente(event)">
+                    <div class="form-group">
+                        <label>Nombre del Complejo Deportivo</label>
+                        <input type="text" id="nuevo-nombre" placeholder="Ej: Complejo Los Álamos" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Email (Usuario de acceso)</label>
+                        <input type="email" id="nuevo-email" placeholder="contacto@losalamos.com" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Contraseña Temporal</label>
+                        <input type="text" id="nuevo-password" placeholder="Ej: alamos2026" required>
+                    </div>
+                    
+                    <button type="submit" class="btn-primary">Crear Cuenta y Generar Entorno</button>
+                </form>
+                <div id="mensaje-creacion" style="margin-top: 15px; text-align: center; font-weight: bold;"></div>
+            </div>
+        </div>
+
     </main>
-<div id="modal-registro" class="modal-overlay">
-        <div class="modal-content">
-            <h2 style="margin-top: 0;">Registrar Nuevo Negocio</h2>
-            <form id="form-registro" onsubmit="registrarNegocio(event)">
-                <div class="form-group">
-                    <label>Nombre del Complejo</label>
-                    <input type="text" id="reg-nombre" required placeholder="Ej: La Canchita FC">
-                </div>
-                <div class="form-group">
-                    <label>Email (Login del cliente)</label>
-                    <input type="email" id="reg-email" required placeholder="Ej: admin@lacanchita.com">
-                </div>
-                <div class="form-group">
-                    <label>Contraseña Provisoria</label>
-                    <input type="password" id="reg-password" required placeholder="Ej: cliente123">
-                </div>
-                <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 25px;">
-                    <button type="button" class="btn-secondary" onclick="cerrarModal()">Cancelar</button>
-                    <button type="submit" class="btn-primary">Crear Cuenta</button>
-                </div>
-            </form>
-        </div>
-    </div>
+
     <script>
-        function abrirModalNuevoCliente() {
-            document.getElementById('modal-registro').style.display = 'flex';
+        // --- CONFIGURACIÓN MAESTRA ---
+        // ⚠️ IMPORTANTE: Este token debe ser exactamente el mismo que tenés definido en tu main.py
+        const TOKEN_MAESTRO = "surya2016"; 
+        const API_URL = "http://127.0.0.1:8000";
+
+        // --- NAVEGACIÓN ENTRE PESTAÑAS ---
+        function cambiarVista(vistaDestino) {
+            document.getElementById('vista-dashboard').classList.add('hidden');
+            document.getElementById('vista-nuevo').classList.add('hidden');
+            
+            document.getElementById('tab-dashboard').classList.remove('active');
+            document.getElementById('tab-nuevo').classList.remove('active');
+            
+            document.getElementById(`vista-${vistaDestino}`).classList.remove('hidden');
+            document.getElementById(`tab-${vistaDestino}`).classList.add('active');
+            
+            // Si volvemos al dashboard, recargamos la lista por si hubo cambios
+            if (vistaDestino === 'dashboard') cargarClientes();
         }
 
-        function cerrarModal() {
-            document.getElementById('modal-registro').style.display = 'none';
-            document.getElementById('form-registro').reset(); // Limpia los campos
+        // --- CARGAR EL DIRECTORIO DE CLIENTES DESDE SUPABASE Y NODE.JS ---
+        async function cargarClientes() {
+            try {
+                // 1. Buscamos los clientes en Python
+                const response = await fetch(`${API_URL}/api/superadmin/clientes?token_maestro=${TOKEN_MAESTRO}`);
+                const data = await response.json();
+                
+                if (data.clientes) {
+                    const tbody = document.getElementById('tabla-clientes-body');
+                    tbody.innerHTML = ''; 
+                    
+                    // 2. Iteramos uno por uno para consultar el estado de su bot en Node.js
+                    for (const cliente of data.clientes) {
+                        let estadoBot = "DESCONECTADO";
+                        let badgeClass = "offline";
+                        
+                        try {
+                            // Consultamos al motor de WhatsApp en el puerto 3000
+                            const botRes = await fetch(`http://127.0.0.1:3000/api/bot/${cliente.id}/status`);
+                            const botData = await botRes.json();
+                            estadoBot = botData.status;
+                            
+                            if (estadoBot === 'CONECTADO') {
+                                badgeClass = 'online';
+                            } else if (estadoBot === 'QR_LISTO' || estadoBot === 'INICIANDO') {
+                                badgeClass = 'online'; // Podrías crear una clase CSS 'warning' amarilla en el futuro si querés
+                            }
+                        } catch(e) {
+                            estadoBot = "APAGADO";
+                        }
+
+                        // 3. Imprimimos la fila en la tabla
+                        tbody.innerHTML += `
+                            <tr>
+                                <td>${cliente.id}</td>
+                                <td><strong>${cliente.nombre}</strong></td>
+                                <td>${cliente.email}</td>
+                                <td><span class="badge ${badgeClass}">${estadoBot}</span></td>
+                                <td><button style="background:transparent; border:1px solid var(--text-muted); color:white; padding:5px 10px; border-radius:4px; cursor:pointer;">Gestionar</button></td>
+                            </tr>
+                        `;
+                    }
+                } else if (data.error) {
+                    console.error("Acceso denegado:", data.error);
+                }
+            } catch (error) {
+                console.error("Error cargando el directorio:", error);
+            }
         }
 
-        async function registrarNegocio(event) {
-            event.preventDefault(); // Evita que la página se recargue
+        // --- CREAR UN NUEVO CLIENTE EN SUPABASE ---
+        async function prepararEnvioCliente(event) {
+            event.preventDefault(); 
             
-            const nombre = document.getElementById('reg-nombre').value;
-            const email = document.getElementById('reg-email').value;
-            const password = document.getElementById('reg-password').value;
+            const nombre = document.getElementById('nuevo-nombre').value;
+            const email = document.getElementById('nuevo-email').value;
+            const password = document.getElementById('nuevo-password').value;
             
-            // La misma llave maestra que pusimos en tu main.py
-            const token_maestro = "Nacho_SaaS_2026_Admin"; 
+            const btn = document.querySelector('#form-nuevo-cliente button');
+            const msjBox = document.getElementById('mensaje-creacion');
+            
+            btn.innerText = "Aprovisionando base de datos...";
+            btn.disabled = true;
+
+            const payload = {
+                nombre: nombre,
+                email: email,
+                password: password,
+                token_maestro: TOKEN_MAESTRO 
+            };
 
             try {
-                // Ajustá esta URL si tu FastAPI corre en otro puerto
-                const response = await fetch('http://127.0.0.1:8000/api/superadmin/clientes', {
+                const response = await fetch(`${API_URL}/api/superadmin/clientes`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ nombre, email, password, token_maestro })
+                    body: JSON.stringify(payload)
                 });
                 
                 const data = await response.json();
                 
-                if (data.error) {
-                    alert("❌ Error: " + data.error);
-                } else {
-                    alert(data.mensaje);
-                    cerrarModal();
-                    cargarClientes(); // Recarga la tabla automáticamente
+                if (data.mensaje) { // Éxito
+                    msjBox.style.color = "var(--success)";
+                    msjBox.innerText = data.mensaje;
+                    document.getElementById('form-nuevo-cliente').reset();
+                    cargarClientes(); // Actualizamos la tabla silenciosamente
+                } else { // Error desde Python
+                    msjBox.style.color = "var(--danger)";
+                    msjBox.innerText = "Error: " + data.error;
                 }
-            } catch (err) {
-                alert("⚠️ Error de conexión con el servidor backend.");
-                console.error(err);
-            }
-        }
-        async function cargarClientes() {
-            const tbody = document.getElementById('tabla-clientes');
-            tbody.innerHTML = '<tr><td colspan="5" style="text-align: center;">Cargando clientes...</td></tr>';
-            
-            const token_maestro = "Nacho_SaaS_2026_Admin";
-            
-            try {
-                const response = await fetch(`http://127.0.0.1:8000/api/superadmin/clientes?token_maestro=${token_maestro}`);
-                const data = await response.json();
-                
-                if (data.error) {
-                    tbody.innerHTML = `<tr><td colspan="5" style="color: #ef4444;">${data.error}</td></tr>`;
-                    return;
-                }
-                
-                tbody.innerHTML = ''; // Limpiamos el mensaje de carga
-                
-                data.clientes.forEach(cliente => {
-                    // Definimos colores según el estado de WhatsApp
-                    let badgeClass = cliente.wa_session_status === 'CONNECTED' ? 'status-online' : 'status-offline';
-                    let statusText = cliente.wa_session_status === 'CONNECTED' ? 'Conectado' : 'Desconectado';
-                    
-                    const fila = `
-                        <tr>
-                            <td>${cliente.id}</td>
-                            <td><strong>${cliente.nombre_negocio}</strong></td>
-                            <td>${cliente.email_login}</td>
-                            <td><span class="status-badge ${badgeClass}">${statusText}</span></td>
-                            <td>
-                                <button class="btn-secondary" style="padding: 6px 12px; font-size: 12px;">Desactivar</button>
-                            </td>
-                        </tr>
-                    `;
-                    tbody.insertAdjacentHTML('beforeend', fila);
-                });
-                
-            } catch (err) {
-                tbody.innerHTML = `<tr><td colspan="5" style="color: #ef4444;">Error de conexión con el servidor.</td></tr>`;
-                console.error(err);
+            } catch (error) {
+                msjBox.style.color = "var(--danger)";
+                msjBox.innerText = "Falla crítica: El servidor backend (FastAPI) no responde.";
+            } finally {
+                btn.innerText = "Crear Cuenta y Generar Entorno";
+                btn.disabled = false;
             }
         }
 
-        // Hacemos que la tabla se cargue sola apenas abrís la página
+        // Disparamos la carga inicial al abrir el panel
         document.addEventListener("DOMContentLoaded", cargarClientes);
     </script>
 </body>
