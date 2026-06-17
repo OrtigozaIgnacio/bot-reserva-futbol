@@ -243,6 +243,18 @@
     </main>
 
     <script>
+        // --- DETECTOR AUTOMÁTICO DE ENTORNO ---
+        let API_URL = "";
+        let BOT_URL = "";
+
+        if (window.location.hostname === "127.0.0.1" || window.location.hostname === "localhost") {
+            API_URL = "http://127.0.0.1:8000";
+            BOT_URL = "http://127.0.0.1:3000";
+        } else {
+            API_URL = "https://ortigoza-apps.duckdns.org"; 
+            BOT_URL = "https://ortigoza-apps.duckdns.org/node"; // ⚠️ Clave para que no falle el bot en prod
+        }
+
         function toggleMontoSena() {
             const tipo = document.getElementById('conf-tipo-cobro').value;
             const caja = document.getElementById('caja-monto-sena');
@@ -289,7 +301,7 @@
         async function cargarConfiguraciones() {
             const id = localStorage.getItem('complejo_id');
             try {
-                const res = await fetch(`https://ortigoza-apps.duckdns.org/api/complejos/${id}/settings`);
+                const res = await fetch(`${API_URL}/api/complejos/${id}/settings`);
                 const data = await res.json();
                 if(data.settings) {
                     const s = data.settings;
@@ -349,7 +361,7 @@
             }
 
             try {
-                const res = await fetch(`https://ortigoza-apps.duckdns.org/api/complejos/${id}/settings`, {
+                const res = await fetch(`${API_URL}/api/complejos/${id}/settings`, {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(payload)
@@ -396,7 +408,7 @@
             if (!confirm("⚠️ ¿Estás seguro de que querés borrar esta cancha? Esta acción no se puede deshacer.")) return;
             
             try {
-                const res = await fetch(`https://ortigoza-apps.duckdns.org/api/canchas/${id}`, { method: 'DELETE' });
+                const res = await fetch(`${API_URL}/api/canchas/${id}`, { method: 'DELETE' });
                 const data = await res.json();
                 if (data.error) alert("❌ " + data.error);
                 else {
@@ -414,7 +426,7 @@
             tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 20px;">Cargando inventario...</td></tr>';
 
             try {
-                const res = await fetch(`https://ortigoza-apps.duckdns.org/api/complejos/${idComplejo}/canchas`);
+                const res = await fetch(`${API_URL}/api/complejos/${idComplejo}/canchas`);
                 const data = await res.json();
                 
                 if (data.canchas && data.canchas.length > 0) {
@@ -460,13 +472,13 @@
                 let res;
                 // Si idCancha existe, es una EDICIÓN (PUT). Si está vacío, es NUEVA (POST).
                 if (idCancha) {
-                    res = await fetch(`https://ortigoza-apps.duckdns.org/api/canchas/${idCancha}`, {
+                    res = await fetch(`${API_URL}/api/canchas/${idCancha}`, {
                         method: 'PUT',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify(payload)
                     });
                 } else {
-                    res = await fetch(`https://ortigoza-apps.duckdns.org/api/complejos/${idComplejo}/canchas`, {
+                    res = await fetch(`${API_URL}/api/complejos/${idComplejo}/canchas`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify(payload)
@@ -497,7 +509,7 @@
             btn.innerText = "Generando..."; btn.disabled = true; msjBox.innerText = "";
 
             try {
-                const res = await fetch(`https://ortigoza-apps.duckdns.org/api/complejos/${idComplejo}/generar_agenda`, { method: 'POST' });
+                const res = await fetch(`${API_URL}/api/complejos/${idComplejo}/generar_agenda`, { method: 'POST' });
                 const data = await res.json();
                 
                 if (data.error) {
@@ -572,7 +584,7 @@
 
             try {
                 // Hacemos el fetch a la API (Próximamente actualizaremos Python para que traiga 7 días en vez de 2)
-                const res = await fetch(`https://ortigoza-apps.duckdns.org/api/complejos/${idComplejo}/turnos_hoy`);
+                const res = await fetch(`${API_URL}/api/complejos/${idComplejo}/turnos_hoy`);
                 const data = await res.json();
                 
                 if (data.turnos) {
@@ -666,7 +678,7 @@
             if (!confirm(mensajeConfirmacion)) return;
 
             try {
-                const res = await fetch(`https://ortigoza-apps.duckdns.org/api/turnos/${idTurno}/estado`, {
+                const res = await fetch(`${API_URL}/api/turnos/${idTurno}/estado`, {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ estado: nuevoEstado })
@@ -689,7 +701,7 @@
 
             try {
                 // Consultamos a Node.js (que corre en el puerto 3000)
-                const res = await fetch(`https://ortigoza-apps.duckdns.org:3000/api/bot/${id}/status`);
+                const res = await fetch(`${BOT_URL}/api/bot/${id}/status`);
                 const data = await res.json();
                 
                 if (data.status === 'CONECTADO') {
@@ -718,7 +730,7 @@
             document.getElementById('qr-container').innerHTML = '<div style="color: #f59e0b; text-align: center;">Enviando señal de encendido...</div>';
             
             try {
-                await fetch(`https://ortigoza-apps.duckdns.org:3000/api/bot/${id}/start`, { method: 'POST' });
+                await fetch(`${BOT_URL}/api/bot/${id}/start`, { method: 'POST' });
             } catch (e) {
                 alert("Error al intentar encender el bot.");
             }

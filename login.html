@@ -56,6 +56,15 @@
     </div>
 
     <script>
+        // --- DETECTOR AUTOMÁTICO DE ENTORNO ---
+        let API_URL = "";
+
+        if (window.location.hostname === "127.0.0.1" || window.location.hostname === "localhost") {
+            API_URL = "http://127.0.0.1:8000";
+        } else {
+            API_URL = "https://ortigoza-apps.duckdns.org"; 
+        }
+
         async function procesarLogin(event) {
             event.preventDefault();
             
@@ -66,7 +75,8 @@
             msjError.style.display = 'none';
 
             try {
-                const response = await fetch('https://ortigoza-apps.duckdns.org/api/login', {
+                // ⚠️ MODIFICADO: Ahora usa la variable inteligente
+                const response = await fetch(`${API_URL}/api/login`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ email, password })
@@ -78,15 +88,13 @@
                     msjError.textContent = data.error;
                     msjError.style.display = 'block';
                 } else {
-                    // ¡Éxito! Guardamos el ID del complejo en la memoria del navegador
                     localStorage.setItem('complejo_id', data.complejo_id);
                     localStorage.setItem('complejo_nombre', data.nombre);
-                    
-                    // Redirigimos al cliente a su panel principal
                     window.location.href = 'home.html';
                 }
-            } catch (err) {
-                msjError.textContent = "Error de conexión con el servidor.";
+            } catch (error) {
+                console.error("Error:", error);
+                msjError.textContent = "Error al conectar con el servidor.";
                 msjError.style.display = 'block';
             }
         }

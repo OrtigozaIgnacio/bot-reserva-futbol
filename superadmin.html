@@ -143,7 +143,20 @@
         // --- CONFIGURACIÓN MAESTRA ---
         // ⚠️ IMPORTANTE: Este token debe ser exactamente el mismo que tenés definido en tu main.py
         const TOKEN_MAESTRO = "surya2016"; 
-        const API_URL = "https://ortigoza-apps.duckdns.org";
+        let API_URL = "";
+        let BOT_URL = "";
+
+        if (window.location.hostname === "127.0.0.1" || window.location.hostname === "localhost") {
+            // MODO DESARROLLO (Tu PC)
+            API_URL = "http://127.0.0.1:8000";
+            BOT_URL = "http://127.0.0.1:3000";
+            console.log("🛠️ Corriendo en Modo Local");
+        } else {
+            // MODO PRODUCCIÓN (Contabo + DuckDNS)
+            API_URL = "https://ortigoza-apps.duckdns.org"; 
+            BOT_URL = "https://ortigoza-apps.duckdns.org/node";
+            console.log("🚀 Corriendo en Producción");
+        }
 
         // --- NAVEGACIÓN ENTRE PESTAÑAS ---
         function cambiarVista(vistaDestino) {
@@ -178,7 +191,7 @@
                         
                         try {
                             // Consultamos al motor de WhatsApp en el puerto 3000
-                            const botRes = await fetch(`https://ortigoza-apps.duckdns.org/node/api/bot/${cliente.id}/status`);
+                            const botRes = await fetch(`${BOT_URL}/api/bot/${cliente.id}/status`);
                             const botData = await botRes.json();
                             estadoBot = botData.status;
                             
