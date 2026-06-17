@@ -143,7 +143,7 @@
         // --- CONFIGURACIÓN MAESTRA ---
         // ⚠️ IMPORTANTE: Este token debe ser exactamente el mismo que tenés definido en tu main.py
         const TOKEN_MAESTRO = "surya2016"; 
-        const API_URL = "http://127.0.0.1:8000";
+        const API_URL = "https://ortigoza-apps.duckdns.org";
 
         // --- NAVEGACIÓN ENTRE PESTAÑAS ---
         function cambiarVista(vistaDestino) {
@@ -178,7 +178,7 @@
                         
                         try {
                             // Consultamos al motor de WhatsApp en el puerto 3000
-                            const botRes = await fetch(`http://127.0.0.1:3000/api/bot/${cliente.id}/status`);
+                            const botRes = await fetch(`https://ortigoza-apps.duckdns.org/node/api/bot/${cliente.id}/status`);
                             const botData = await botRes.json();
                             estadoBot = botData.status;
                             
@@ -192,13 +192,22 @@
                         }
 
                         // 3. Imprimimos la fila en la tabla
+                        const nombreReal = cliente.nombre_negocio || cliente.nombre || "Sin Nombre";
+                        
+                        // 🎯 Apuntamos directamente a tu columna real en la base de datos
+                        const emailReal = cliente.email_login || "Sin Email Registrado";
+                        
                         tbody.innerHTML += `
                             <tr>
                                 <td>${cliente.id}</td>
-                                <td><strong>${cliente.nombre}</strong></td>
-                                <td>${cliente.email}</td>
+                                <td><strong>${nombreReal}</strong></td>
+                                <td>${emailReal}</td>
                                 <td><span class="badge ${badgeClass}">${estadoBot}</span></td>
-                                <td><button style="background:transparent; border:1px solid var(--text-muted); color:white; padding:5px 10px; border-radius:4px; cursor:pointer;">Gestionar</button></td>
+                                <td>
+                                    <button onclick="forzarLoginComoCliente(${cliente.id}, '${nombreReal}')" style="background:var(--accent); border:none; color:white; padding:6px 12px; border-radius:4px; cursor:pointer; font-weight:bold; transition: 0.2s;">
+                                        Entrar al Panel
+                                    </button>
+                                </td>
                             </tr>
                         `;
                     }
@@ -207,6 +216,18 @@
                 }
             } catch (error) {
                 console.error("Error cargando el directorio:", error);
+            }
+        }
+
+        // --- FUNCIÓN DE SUPERPODER: ENTRAR AL PANEL DEL CLIENTE ---
+        function forzarLoginComoCliente(idComplejo, nombreComplejo) {
+            if(confirm(`¿Estás seguro que querés entrar al panel de gestión de "${nombreComplejo}"?\n\nTendrás control total sobre sus canchas y turnos.`)) {
+                // Guardamos los datos en la memoria del navegador simulando que iniciamos sesión
+                localStorage.setItem('complejo_id', idComplejo);
+                localStorage.setItem('complejo_nombre', nombreComplejo);
+                
+                // Lo redirigimos al panel del cliente (home.html)
+                window.location.href = 'home.html';
             }
         }
 

@@ -226,13 +226,35 @@ Hola {nombre_jugador}, tu pago ha sido aprobado exitosamente. Acá tenés tu tic
         if exito:
             actualizar_estado_usuario(telefono_cliente, "ESPERANDO_PAGO")
             
-            # Leemos los datos configurados en el panel web
+            # Buscamos el precio real de la cancha en la BD
+            precio_cancha = obtener_precio_por_turno(turno_id)
+            
+            # Leemos las reglas de cobro del panel web
             settings = config_complejo.get("settings", {})
             alias = settings.get("alias_pago", "NO_CONFIGURADO")
+            titular = settings.get("titular_pago", "NO_CONFIGURADO") # Agregamos la lectura del titular
+            cbu = settings.get("cbu_pago", "NO_CONFIGURADO")         # Agregamos la lectura del CBU
             tolerancia = settings.get("minutos_tolerancia_pago", 15)
-            tipo_cobro = "el total de la cancha" if settings.get("tipo_cobro", "TOTAL") == "TOTAL" else "la seña correspondiente"
+            tipo_cobro = settings.get("tipo_cobro", "TOTAL")
+            monto_sena = settings.get("monto_sena", 0)
             
-            respuesta = f"¡Perfecto! Ya bloqueé la cancha a tu nombre. ⏳\n\nPor favor, transferí {tipo_cobro} al alias *{alias}* y enviame la *FOTO del comprobante* por acá.\n\nTenés {tolerancia} minutos exactos antes de que el sistema libere el turno automáticamente."
+            # Lógica matemática del mensaje
+            if tipo_cobro == "SENA" and monto_sena > 0:
+                texto_cobro = f"la seña de *${monto_sena}*"
+            else:
+                texto_cobro = f"el total de *${precio_cancha}*"
+            
+            # Armamos el nuevo mensaje estructurado
+            respuesta = f"""¡Perfecto! Ya bloqueé la cancha a tu nombre. ⏳
+
+El valor total de la cancha es de *${precio_cancha}*.
+Por favor, transferí {texto_cobro} al alias *{alias}* y enviame la *FOTO del comprobante* por acá.
+
+💳 *Nombre del titular de la cuenta:* {titular}
+🏦 *CBU/CVU:* {cbu}
+
+Tenés {tolerancia} minutos exactos antes de que el sistema libere el turno automáticamente. ¡Muchas gracias por elegirnos!"""
+            
             return {"reply": respuesta}
         else:
             limpiar_usuario(telefono_cliente)
@@ -374,11 +396,34 @@ async def editar_cancha_api(cancha_id: int, datos: NuevaCancha):
 
 @app.delete("/api/canchas/{cancha_id}")
 async def borrar_cancha_api(cancha_id: int):
-    """Elimina la cancha seleccionada."""
-    exito = eliminar_cancha(cancha_id)
-    if exito:
-        return {"mensaje": "✅ Cancha eliminada correctamente."}
-    return {"error": "Error al eliminar la cancha."}
+    """Elimina una cancha y hace una limpieza en cascada de sus turnos vacíos."""
+    try:
+        # 1. Buscamos los datos de la cancha ANTES de borrarla para saber su nombre
+        res_cancha = supabase.table('canchas').select('nombre, complejo_id').eq('id', cancha_id).execute()
+        
+        if res_cancha.data:
+            nombre_cancha = res_cancha.data[0]['nombre']
+            complejo_id = res_cancha.data[0]['complejo_id']
+            
+            # 2. LIMPIEZA EN CASCADA SEGURA: Borramos solo los turnos que nadie compró aún
+            supabase.table('turnos') \
+                .delete() \
+                .eq('complex_id', complejo_id) \
+                .eq('cancha_nombre', nombre_cancha) \
+                .eq('estado', 'disponible') \
+                .execute()
+            
+            # 3. Finalmente, eliminamos la cancha del sistema
+            supabase.table('canchas').delete().eq('id', cancha_id).execute()
+            
+            print(f"🗑️ [BACKEND] Cancha '{nombre_cancha}' eliminada junto con sus turnos disponibles.")
+            return {"mensaje": f"✅ La cancha y sus horarios disponibles fueron eliminados correctamente."}
+        else:
+            return {"error": "La cancha que intentas eliminar no existe en la base de datos."}
+            
+    except Exception as e:
+        print(f"❌ [BACKEND] Error al eliminar cancha: {e}")
+        return {"error": "Hubo un problema interno al intentar eliminar la cancha."}
 
 if __name__ == "__main__":
     print("🚀 Iniciando SaaS Core en puerto 8000...")

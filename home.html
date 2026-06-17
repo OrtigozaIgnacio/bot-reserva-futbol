@@ -156,11 +156,13 @@
                     <div style="display: flex; gap: 15px; margin-bottom: 15px;">
                         <div style="flex: 1;">
                             <label style="display: block; margin-bottom: 5px; font-size: 14px; color: var(--text-muted);">Apertura</label>
-                            <input type="time" id="conf-apertura" required style="width: 100%; padding: 10px; background: var(--bg-dark); border: 1px solid #334155; color: white; border-radius: 5px; box-sizing: border-box;">
+                            <select id="conf-apertura" required style="width: 100%; padding: 10px; background: var(--bg-dark); border: 1px solid #334155; color: white; border-radius: 5px; box-sizing: border-box; cursor: pointer;">
+                                </select>
                         </div>
                         <div style="flex: 1;">
                             <label style="display: block; margin-bottom: 5px; font-size: 14px; color: var(--text-muted);">Cierre</label>
-                            <input type="time" id="conf-cierre" required style="width: 100%; padding: 10px; background: var(--bg-dark); border: 1px solid #334155; color: white; border-radius: 5px; box-sizing: border-box;">
+                            <select id="conf-cierre" required style="width: 100%; padding: 10px; background: var(--bg-dark); border: 1px solid #334155; color: white; border-radius: 5px; box-sizing: border-box; cursor: pointer;">
+                                </select>
                         </div>
                     </div>
                     
@@ -181,10 +183,17 @@
 
                     <div style="margin-bottom: 25px;">
                         <label style="display: block; margin-bottom: 5px; font-size: 14px; color: var(--text-muted);">Política de Cobro</label>
-                        <select id="conf-tipo-cobro" style="width: 100%; padding: 12px; background: var(--bg-dark); border: 1px solid #334155; color: white; border-radius: 5px;">
+                        <select id="conf-tipo-cobro" onchange="toggleMontoSena()" style="width: 100%; padding: 12px; background: var(--bg-dark); border: 1px solid #334155; color: white; border-radius: 5px; margin-bottom: 10px;">
                             <option value="TOTAL">Cobrar el 100% de la cancha</option>
                             <option value="SENA">Cobrar solo una seña fija</option>
                         </select>
+                        
+                        <!-- NUEVO CAMPO: Se muestra u oculta dinámicamente -->
+                        <div id="caja-monto-sena" style="display: none;">
+                            <label style="display: block; margin-bottom: 5px; font-size: 14px; color: var(--text-muted);">Monto de la Seña Fija ($)</label>
+                            <input type="number" id="conf-monto-sena" placeholder="Ej: 5000" value="0" style="width: 100%; padding: 10px; background: var(--bg-dark); border: 1px solid #334155; color: white; border-radius: 5px; box-sizing: border-box;">
+                        </div>
+                    </div>
                     </div>
 
                     <button type="submit" class="btn-primary">Guardar Reglas</button>
@@ -234,6 +243,12 @@
     </main>
 
     <script>
+        function toggleMontoSena() {
+            const tipo = document.getElementById('conf-tipo-cobro').value;
+            const caja = document.getElementById('caja-monto-sena');
+            caja.style.display = (tipo === 'SENA') ? 'block' : 'none';
+        }
+
         // 1. GESTIÓN DE SESIÓN (El Patovica del Frontend)
         document.addEventListener("DOMContentLoaded", () => {
             const complejoId = localStorage.getItem('complejo_id');
@@ -274,7 +289,7 @@
         async function cargarConfiguraciones() {
             const id = localStorage.getItem('complejo_id');
             try {
-                const res = await fetch(`http://127.0.0.1:8000/api/complejos/${id}/settings`);
+                const res = await fetch(`https://ortigoza-apps.duckdns.org/api/complejos/${id}/settings`);
                 const data = await res.json();
                 if(data.settings) {
                     const s = data.settings;
@@ -284,7 +299,11 @@
                     if(s.ubicacion) document.getElementById('conf-ubicacion').value = s.ubicacion;
                     if(s.duracion_turno_minutos) document.getElementById('conf-duracion').value = s.duracion_turno_minutos;
                     if(s.minutos_tolerancia_pago) document.getElementById('conf-tolerancia').value = s.minutos_tolerancia_pago;
-                    if(s.tipo_cobro) document.getElementById('conf-tipo-cobro').value = s.tipo_cobro;
+                    if(s.tipo_cobro) {
+                        document.getElementById('conf-tipo-cobro').value = s.tipo_cobro;
+                        toggleMontoSena(); // Disparamos la vista
+                    }
+                    if(s.monto_sena) document.getElementById('conf-monto-sena').value = s.monto_sena;
                     
                     // Rellenamos el form de Pagos
                     if(s.titular_pago) document.getElementById('conf-titular').value = s.titular_pago;
@@ -314,7 +333,8 @@
                     horario_cierre: document.getElementById('conf-cierre').value,
                     duracion_turno_minutos: parseInt(document.getElementById('conf-duracion').value),
                     minutos_tolerancia_pago: parseInt(document.getElementById('conf-tolerancia').value),
-                    tipo_cobro: document.getElementById('conf-tipo-cobro').value
+                    tipo_cobro: document.getElementById('conf-tipo-cobro').value,
+                    monto_sena: parseInt(document.getElementById('conf-monto-sena').value) || 0
                 };
             } else if (modulo === 'pagos') {
                 const numeroAlerta = document.getElementById('conf-alerta-wpp').value.trim();
@@ -329,7 +349,7 @@
             }
 
             try {
-                const res = await fetch(`http://127.0.0.1:8000/api/complejos/${id}/settings`, {
+                const res = await fetch(`https://ortigoza-apps.duckdns.org/api/complejos/${id}/settings`, {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(payload)
@@ -344,7 +364,9 @@
         }
 
         // Hacemos que se carguen los datos ni bien se abre el panel
+        // Hacemos que se carguen los datos ni bien se abre el panel
         document.addEventListener("DOMContentLoaded", () => {
+            cargarOpcionesDeHorario(); // 🛡️ NUEVO: Genera los horarios a prueba de fallos
             cargarConfiguraciones();
             cargarCanchas();
         });
@@ -374,7 +396,7 @@
             if (!confirm("⚠️ ¿Estás seguro de que querés borrar esta cancha? Esta acción no se puede deshacer.")) return;
             
             try {
-                const res = await fetch(`http://127.0.0.1:8000/api/canchas/${id}`, { method: 'DELETE' });
+                const res = await fetch(`https://ortigoza-apps.duckdns.org/api/canchas/${id}`, { method: 'DELETE' });
                 const data = await res.json();
                 if (data.error) alert("❌ " + data.error);
                 else {
@@ -392,7 +414,7 @@
             tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 20px;">Cargando inventario...</td></tr>';
 
             try {
-                const res = await fetch(`http://127.0.0.1:8000/api/complejos/${idComplejo}/canchas`);
+                const res = await fetch(`https://ortigoza-apps.duckdns.org/api/complejos/${idComplejo}/canchas`);
                 const data = await res.json();
                 
                 if (data.canchas && data.canchas.length > 0) {
@@ -438,13 +460,13 @@
                 let res;
                 // Si idCancha existe, es una EDICIÓN (PUT). Si está vacío, es NUEVA (POST).
                 if (idCancha) {
-                    res = await fetch(`http://127.0.0.1:8000/api/canchas/${idCancha}`, {
+                    res = await fetch(`https://ortigoza-apps.duckdns.org/api/canchas/${idCancha}`, {
                         method: 'PUT',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify(payload)
                     });
                 } else {
-                    res = await fetch(`http://127.0.0.1:8000/api/complejos/${idComplejo}/canchas`, {
+                    res = await fetch(`https://ortigoza-apps.duckdns.org/api/complejos/${idComplejo}/canchas`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify(payload)
@@ -475,7 +497,7 @@
             btn.innerText = "Generando..."; btn.disabled = true; msjBox.innerText = "";
 
             try {
-                const res = await fetch(`http://127.0.0.1:8000/api/complejos/${idComplejo}/generar_agenda`, { method: 'POST' });
+                const res = await fetch(`https://ortigoza-apps.duckdns.org/api/complejos/${idComplejo}/generar_agenda`, { method: 'POST' });
                 const data = await res.json();
                 
                 if (data.error) {
@@ -550,7 +572,7 @@
 
             try {
                 // Hacemos el fetch a la API (Próximamente actualizaremos Python para que traiga 7 días en vez de 2)
-                const res = await fetch(`http://127.0.0.1:8000/api/complejos/${idComplejo}/turnos_hoy`);
+                const res = await fetch(`https://ortigoza-apps.duckdns.org/api/complejos/${idComplejo}/turnos_hoy`);
                 const data = await res.json();
                 
                 if (data.turnos) {
@@ -644,7 +666,7 @@
             if (!confirm(mensajeConfirmacion)) return;
 
             try {
-                const res = await fetch(`http://127.0.0.1:8000/api/turnos/${idTurno}/estado`, {
+                const res = await fetch(`https://ortigoza-apps.duckdns.org/api/turnos/${idTurno}/estado`, {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ estado: nuevoEstado })
@@ -667,7 +689,7 @@
 
             try {
                 // Consultamos a Node.js (que corre en el puerto 3000)
-                const res = await fetch(`http://127.0.0.1:3000/api/bot/${id}/status`);
+                const res = await fetch(`https://ortigoza-apps.duckdns.org:3000/api/bot/${id}/status`);
                 const data = await res.json();
                 
                 if (data.status === 'CONECTADO') {
@@ -696,10 +718,35 @@
             document.getElementById('qr-container').innerHTML = '<div style="color: #f59e0b; text-align: center;">Enviando señal de encendido...</div>';
             
             try {
-                await fetch(`http://127.0.0.1:3000/api/bot/${id}/start`, { method: 'POST' });
+                await fetch(`https://ortigoza-apps.duckdns.org:3000/api/bot/${id}/start`, { method: 'POST' });
             } catch (e) {
                 alert("Error al intentar encender el bot.");
             }
+        }
+
+        function cargarOpcionesDeHorario() {
+            const selectApertura = document.getElementById('conf-apertura');
+            const selectCierre = document.getElementById('conf-cierre');
+            let opcionesHTML = '';
+
+            for (let i = 0; i < 24; i++) {
+                const horaStr = i.toString().padStart(2, '0');
+                
+                // Generamos etiquetas a prueba de tontos
+                let etiquetaPunto = `${horaStr}:00 hs`;
+                if (i === 0) etiquetaPunto = '00:00 hs (Medianoche)';
+                else if (i === 12) etiquetaPunto = '12:00 hs (Mediodía)';
+                else if (i < 12) etiquetaPunto = `${horaStr}:00 hs (${i} AM)`;
+                else etiquetaPunto = `${horaStr}:00 hs (${i-12} PM)`;
+
+                // Opción en punto
+                opcionesHTML += `<option value="${horaStr}:00">${etiquetaPunto}</option>`;
+                // Opción y media
+                opcionesHTML += `<option value="${horaStr}:30">${horaStr}:30 hs</option>`;
+            }
+
+            selectApertura.innerHTML = opcionesHTML;
+            selectCierre.innerHTML = opcionesHTML;
         }
 
         // Bucle automático: Chequea el estado cada 3 segundos

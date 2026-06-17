@@ -390,3 +390,23 @@ def cambiar_estado_turno_manual(turno_id: int, nuevo_estado: str) -> bool:
     except Exception as e:
         print(f"❌ [DATABASE] Error cambiando estado del turno: {e}")
         return False
+
+def obtener_precio_por_turno(turno_id: int) -> int:
+    """Busca un turno y devuelve el precio exacto de la cancha asignada a ese turno."""
+    try:
+        # 1. Buscamos qué cancha y complejo tiene el turno
+        res_turno = supabase.table('turnos').select('cancha_nombre, complex_id').eq('id', turno_id).execute()
+        if not res_turno.data:
+            return 0
+            
+        cancha_nombre = res_turno.data[0]['cancha_nombre']
+        complex_id = res_turno.data[0]['complex_id']
+        
+        # 2. Buscamos el precio de esa cancha específica
+        res_cancha = supabase.table('canchas').select('precio').eq('nombre', cancha_nombre).eq('complejo_id', complex_id).execute()
+        if res_cancha.data:
+            return res_cancha.data[0]['precio']
+        return 0
+    except Exception as e:
+        print(f"❌ [DATABASE] Error obteniendo el precio del turno: {e}")
+        return 0

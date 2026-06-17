@@ -53,7 +53,7 @@ const startBot = (complejoId) => {
 
         // 💾 AUTO-VINCULACIÓN: Registra el número en Supabase de forma transparente
         try {
-            await axios.put(`http://127.0.0.1:8000/api/complejos/${complejoId}/vincular_whatsapp`, {
+            await axios.put(`https://tunegocio.duckdns.org/api/complejos/${complejoId}/vincular_whatsapp`, {
                 numero_whatsapp: botNumber
             });
             console.log(`💾 [BOT ${complejoId}] Número ${botNumber} guardado automáticamente en Supabase.`);
@@ -116,7 +116,7 @@ const startBot = (complejoId) => {
 
         // 2. Disparamos a FastAPI
         try {
-            const response = await axios.post('http://127.0.0.1:8000/webhook', payload);
+            const response = await axios.post('https://tunegocio.duckdns.org/webhook', payload);
             
             // 3. Responder al jugador
             if (response.data && response.data.reply) {
@@ -192,3 +192,40 @@ app.post('/api/bot/:id/start', (req, res) => {
 app.listen(3000, () => {
     console.log(`🚀 Motor WhatsApp Multi-Sesión escuchando en el puerto 3000`);
 });
+
+// ==========================================
+// 🔄 RUTINA DE AUTO-ARRANQUE (PRODUCCIÓN)
+// ==========================================
+const autoLevantarBots = () => {
+    console.log("🔄 Iniciando rutina de Auto-Arranque de bots...");
+    const authPath = path.join(__dirname, '.wwebjs_auth');
+    
+    // Verificamos si la carpeta existe
+    if (!fs.existsSync(authPath)) {
+        console.log("📁 No hay sesiones guardadas previas.");
+        return;
+    }
+
+    // Leemos todas las carpetas de sesiones guardadas
+    const carpetas = fs.readdirSync(authPath);
+    let botsRestaurados = 0;
+
+    carpetas.forEach(carpeta => {
+        // Buscamos las carpetas que se llaman "session-bot_X"
+        if (carpeta.startsWith('session-bot_')) {
+            const idString = carpeta.split('session-bot_')[1];
+            const idComplejo = parseInt(idString);
+            
+            if (!isNaN(idComplejo)) {
+                console.log(`🔋 Restaurando automáticamente sesión del Complejo ID: ${idComplejo}`);
+                startBot(idComplejo); // Llamamos a tu función de arranque para cada uno
+                botsRestaurados++;
+            }
+        }
+    });
+
+    console.log(`✅ Rutina finalizada: Se mandaron a arrancar ${botsRestaurados} bots.`);
+};
+
+// Disparamos la función al arrancar Node.js
+autoLevantarBots();
