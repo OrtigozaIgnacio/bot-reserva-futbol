@@ -15,7 +15,11 @@ app = FastAPI()
 # --- INICIO DEL ESCUDO CORS ---
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], # En producción pondremos el dominio real de tu web
+    allow_origins=[
+        "https://ortigoza-apps.duckdns.org", 
+        "http://localhost:8000", # Dejamos este por si necesitas testear algo localmente
+        "http://127.0.0.1:8000"
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
