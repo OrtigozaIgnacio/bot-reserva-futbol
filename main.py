@@ -10,6 +10,7 @@ from memory import obtener_usuario, actualizar_estado_usuario, limpiar_usuario, 
 from bot_core import generar_respuesta
 from fastapi.middleware.cors import CORSMiddleware
 
+
 app = FastAPI()
 
 # --- INICIO DEL ESCUDO CORS ---
@@ -17,8 +18,10 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "https://ortigoza-apps.duckdns.org", 
-        "http://localhost:8000", # Dejamos este por si necesitas testear algo localmente
-        "http://127.0.0.1:8000"
+        "http://localhost:8000", 
+        "http://127.0.0.1:8000",
+        "http://127.0.0.1:5500",  # <-- AGREGADO PARA TU LIVE SERVER
+        "http://localhost:5500"   # <-- AGREGADO PARA TU LIVE SERVER
     ],
     allow_credentials=True,
     allow_methods=["*"],
@@ -54,6 +57,21 @@ class WebhookPayload(BaseModel):
     has_media: bool
     media_data: Optional[str] = None
     mime_type: Optional[str] = None
+
+# Creamos el modelo de lo que envía Node.js
+class DatosRegistroBot(BaseModel):
+    numero: str
+
+# 🚪 La puerta que estaba faltando para que no dé error 404
+@app.post("/api/bot/{complejo_id}/registro")
+async def registrar_numero_bot(complejo_id: int, datos: DatosRegistroBot):
+    # Imprimimos en la terminal de Python para confirmar que llegó la info
+    print(f"✅ [FASTAPI] El Bot del complejo {complejo_id} reportó su número de WhatsApp: {datos.numero}")
+    
+    # Próximamente acá podrías agregar una función que guarde este número en la tabla "complejos" de Supabase
+    
+    # Le respondemos a Node.js que recibimos el mensaje (Código 200 OK)
+    return {"status": "ok", "mensaje": "Número registrado con éxito"}
 
 # Agregá esto cerca de donde definiste tus otros modelos Pydantic
 class NuevoCliente(BaseModel):

@@ -46,17 +46,13 @@ const startBot = (complejoId) => {
     });
 
     client.on('ready', async () => {
-        const botNumber = client.info.wid.user; // Extrae el número del WhatsApp escaneado
-        console.log(`✅ [BOT ${complejoId}] ¡Conectado y Listo! Número detectado: ${botNumber}`);
-        qrCodes[complejoId] = null;
         statuses[complejoId] = 'CONECTADO';
-
-        // 💾 AUTO-VINCULACIÓN: Registra el número en Supabase de forma transparente
+        const numeroBot = client.info.wid.user;
+        console.log(`✅ [BOT ${complejoId}] ¡Conectado y Listo! Número detectado: ${numeroBot}`);
+        
+        // ⚠️ CORRECCIÓN: Le avisamos a FastAPI usando la red interna
         try {
-            await axios.put(`https://tunegocio.duckdns.org/api/complejos/${complejoId}/vincular_whatsapp`, {
-                numero_whatsapp: botNumber
-            });
-            console.log(`💾 [BOT ${complejoId}] Número ${botNumber} guardado automáticamente en Supabase.`);
+            await axios.post(`http://127.0.0.1:8000/api/bot/${complejoId}/registro`, { numero: numeroBot });
         } catch (error) {
             console.log(`⚠️ [BOT ${complejoId}] No se pudo registrar el número en el backend:`, error.message);
         }
@@ -114,10 +110,10 @@ const startBot = (complejoId) => {
             mime_type: mimeType
         };
 
-        // 2. Disparamos a FastAPI
+        // 2. Disparamos a FastAPI (¡SIEMPRE POR LA RED INTERNA!)
         try {
-            const response = await axios.post('https://tunegocio.duckdns.org/webhook', payload);
-            
+            const response = await axios.post('http://127.0.0.1:8000/webhook', payload);
+
             // 3. Responder al jugador
             if (response.data && response.data.reply) {
                 await client.sendMessage(msg.from, response.data.reply);
@@ -186,6 +182,35 @@ app.post('/api/bot/:id/start', (req, res) => {
     const id = req.params.id;
     startBot(id);
     res.json({ mensaje: 'Orden de encendido enviada.' });
+});
+
+// ==========================================
+// 🛑 KILL SWITCH: APAGAR EL BOT
+// ==========================================
+app.post('/api/bot/:id/stop', async (req, res) => {
+    const complejoId = req.params.id;
+    console.log(`🛑 [BOT ${complejoId}] Recibida orden de APAGADO desde el panel...`);
+
+    // 1. Verificamos si el bot realmente está corriendo en la memoria
+    if (sessions[complejoId]) {
+        try {
+            // Destruimos la instancia de WhatsApp (Cierra el Chrome invisible y libera la RAM)
+            await sessions[complejoId].destroy();
+            console.log(`✅ [BOT ${complejoId}] Motor destruido y memoria liberada.`);
+        } catch (error) {
+            console.error(`⚠️ [BOT ${complejoId}] Error al intentar cerrar el motor:`, error.message);
+        }
+
+        // 2. Limpiamos las variables del servidor para este cliente
+        delete sessions[complejoId];
+        delete qrCodes[complejoId];
+    }
+
+    // 3. Forzamos el estado a APAGADO para que el frontend actualice el botón
+    statuses[complejoId] = 'APAGADO';
+
+    // 4. Le avisamos al panel web que todo salió bien
+    res.json({ success: true, message: "Bot apagado correctamente" });
 });
 
 // Iniciamos la API del puente

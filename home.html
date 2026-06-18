@@ -229,18 +229,26 @@
         </div>
 
         <div id="vista-whatsapp" class="vista">
-            <div class="config-box" style="text-align: center;">
-                <h3>Vincular WhatsApp</h3>
-                <p style="color: var(--text-muted); font-size: 14px; margin-bottom: 20px;">Escaneá el código QR con el celular del complejo para encender el bot.</p>
-                
-                <div id="qr-container" style="background: white; width: 250px; height: 250px; margin: 0 auto; display: flex; justify-content: center; align-items: center; border-radius: 8px;">
-                    <span style="color: #333;">Generando QR...</span>
+                    <div class="config-box" style="text-align: center;">
+                        <h3>Vincular WhatsApp</h3>
+                        <p style="color: var(--text-muted); font-size: 14px; margin-bottom: 20px;">Asegurate de que tu teléfono tenga internet antes de escanear el QR.</p>
+                        
+                        <div id="qr-container" style="background: white; width: 250px; height: 250px; margin: 0 auto; display: flex; justify-content: center; align-items: center; border-radius: 8px;">
+                            <span style="color: #333;">Generando QR...</span>
+                        </div>
+
+                        <div class="bot-control-panel" style="margin-top: 30px; padding: 15px; border: 1px solid #334155; border-radius: 8px; text-align: center; background-color: var(--bg-dark);">
+                            <h3 style="border-bottom: none; margin-bottom: 10px; margin-top: 0;">🤖 Control del Asistente</h3>
+                            <p style="margin-bottom: 15px;">Estado actual: <strong id="status-texto" style="font-size: 16px;">Verificando...</strong></p>
+                            
+                            <button id="btn-toggle-bot" onclick="toggleBot()" style="padding: 10px 20px; font-weight: bold; border: none; border-radius: 5px; cursor: pointer; background-color: #ccc; transition: 0.3s;">
+                                Cargando...
+                            </button>
+                        </div>
+                        
+                    </div>
                 </div>
-                
-                
-            </div>
-        </div>
-    </main>
+            </main>
 
     <script>
         // --- DETECTOR AUTOMÁTICO DE ENTORNO ---
@@ -693,20 +701,36 @@
         }
 
         // --- MÓDULO WHATSAPP (PUENTE NODE.JS) ---
-        let intervaloQr = null;
+        let botEstaPrendido = false;
 
         async function consultarEstadoBot() {
             const id = localStorage.getItem('complejo_id');
             const container = document.getElementById('qr-container');
+            const btn = document.getElementById('btn-toggle-bot');
+            const statusTexto = document.getElementById('status-texto');
 
             try {
-                // Consultamos a Node.js (que corre en el puerto 3000)
+                // Consultamos a Node.js
                 const res = await fetch(`${BOT_URL}/api/bot/${id}/status`);
                 const data = await res.json();
-                
+
                 if (data.status === 'CONECTADO') {
-                    container.innerHTML = '<div style="color: #10b981; font-weight: bold; text-align: center; font-size: 18px;">✅ ¡Bot Conectado y Operativo!</div>';
+                    botEstaPrendido = true;
+                    statusTexto.innerText = "CONECTADO Y OPERATIVO";
+                    statusTexto.style.color = "#10b981"; // Verde
+                    btn.innerText = "🛑 Apagar Bot";
+                    btn.style.backgroundColor = "#ef4444"; // Rojo
+                    btn.style.color = "white";
+                    
+                    container.innerHTML = '<div style="color: #10b981; font-weight: bold; text-align: center; font-size: 18px;">✅ ¡Bot Conectado y Listo!</div>';
                 } else if (data.status === 'QR_LISTO' && data.qr) {
+                    botEstaPrendido = true;
+                    statusTexto.innerText = "ESPERANDO ESCANEO QR";
+                    statusTexto.style.color = "#f59e0b"; // Amarillo
+                    btn.innerText = "🛑 Apagar Bot";
+                    btn.style.backgroundColor = "#ef4444";
+                    btn.style.color = "white";
+                    
                     container.innerHTML = ''; // Limpiamos el texto
                     new QRCode(container, {
                         text: data.qr,
@@ -716,23 +740,58 @@
                         colorLight : "#ffffff"
                     });
                 } else if (data.status === 'INICIANDO') {
-                    container.innerHTML = '<div style="color: #f59e0b; text-align: center; font-weight: bold;">Generando código QR... Aguardá unos segundos.</div>';
+                    botEstaPrendido = true;
+                    statusTexto.innerText = "INICIANDO MOTOR...";
+                    statusTexto.style.color = "#f59e0b";
+                    btn.innerText = "🛑 Apagar Bot";
+                    btn.style.backgroundColor = "#ef4444";
+                    btn.style.color = "white";
+                    
+                    container.innerHTML = '<div style="color: #f59e0b; text-align: center; font-weight: bold;">Cargando sistema... Aguardá unos segundos.</div>';
                 } else {
-                    container.innerHTML = '<button class="btn-primary" onclick="encenderBot()">Encender Motor de WhatsApp</button>';
+                    // Está apagado
+                    botEstaPrendido = false;
+                    statusTexto.innerText = "APAGADO";
+                    statusTexto.style.color = "gray";
+                    btn.innerText = "▶️ Prender Bot";
+                    btn.style.backgroundColor = "#10b981"; // Verde
+                    btn.style.color = "white";
+                    
+                    container.innerHTML = '<div style="color: gray; text-align: center;">El bot está apagado.</div>';
                 }
             } catch(e) {
-                container.innerHTML = '<div style="color: #ef4444; font-weight: bold; text-align: center;">Servidor de WhatsApp apagado.</div>';
+                botEstaPrendido = false;
+                statusTexto.innerText = "ERROR DE CONEXIÓN";
+                statusTexto.style.color = "#ef4444";
+                btn.innerText = "Reintentando...";
+                btn.style.backgroundColor = "#ccc";
+                container.innerHTML = '<div style="color: #ef4444; font-weight: bold; text-align: center;">Servidor apagado.</div>';
             }
         }
 
-        async function encenderBot() {
+        async function toggleBot() {
             const id = localStorage.getItem('complejo_id');
-            document.getElementById('qr-container').innerHTML = '<div style="color: #f59e0b; text-align: center;">Enviando señal de encendido...</div>';
+            const btn = document.getElementById('btn-toggle-bot');
             
+            btn.disabled = true;
+            btn.innerText = "Procesando...";
+            btn.style.backgroundColor = "#ccc";
+
             try {
-                await fetch(`${BOT_URL}/api/bot/${id}/start`, { method: 'POST' });
+                if (botEstaPrendido) {
+                    await fetch(`${BOT_URL}/api/bot/${id}/stop`, { method: 'POST' });
+                    document.getElementById('qr-container').innerHTML = '<div style="color: #f59e0b; text-align: center;">Apagando bot...</div>';
+                } else {
+                    await fetch(`${BOT_URL}/api/bot/${id}/start`, { method: 'POST' });
+                    document.getElementById('qr-container').innerHTML = '<div style="color: #f59e0b; text-align: center;">Enviando señal de encendido...</div>';
+                }
+                
+                // Forzamos un chequeo rápido después de 2 segundos para actualizar pantalla
+                setTimeout(consultarEstadoBot, 2000);
             } catch (e) {
-                alert("Error al intentar encender el bot.");
+                alert("Error al intentar cambiar el estado del bot.");
+            } finally {
+                btn.disabled = false;
             }
         }
 
